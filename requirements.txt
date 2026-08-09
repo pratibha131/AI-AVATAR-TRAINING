@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-multipart
+python-pptx
+lxml
+numpy
+piper-tts
+playwright
+torch
+librosa
+opencv-python-headless
