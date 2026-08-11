@@ -111,8 +111,7 @@ BRAND_NAMES = {
 TRANSITION_CYCLE = ['morph', 'push', 'fade', 'wipe']
 
 def auto_transition(i, n, groups=0):
-    """Content-aware Scene Director: transition chosen from what's on the
-    slide, not a blind rotation."""
+    """Fallback Scene Director (no manifest — e.g. PDF decks)."""
     if i == 0:
         return 'none'
     if i == n - 1:
@@ -124,55 +123,142 @@ def auto_transition(i, n, groups=0):
     return TRANSITION_CYCLE[(i - 1) % len(TRANSITION_CYCLE)]
 
 
-def entrance_plan(regions, gsizes, gtexts=None):
-    """Motion Director: choose each element's entrance from the slide's
-    geometry & semantic content. Lines draw in; timeline markers rise;
-    tool showcases pop sequentially; grid cards slide; bullets rise."""
+def plan_transition(i, n, manifest):
+    """Relationship-aware Scene Director: the cut between two slides is
+    chosen from what the two slides ARE, not from a rotation.
+    Same layout family -> morph (visual continuity). Sparse section slide ->
+    cinematic fade. After a process slide -> directional push that continues
+    the flow. Dense slide -> sweep. Finale -> slow zoom close."""
+    if i == 0:
+        return 'none'
+    m = manifest[i] if manifest and i < len(manifest) else {}
+    pm = manifest[i - 1] if manifest and i - 1 < len(manifest) else {}
+    lay, play = m.get('layout', ''), pm.get('layout', '')
+    groups = len(m.get('regions') or [])
+    if i == n - 1:
+        return 'zoom'
+    if groups <= 2:
+        return 'cinema'                 # section/title beat: cinematic breath
+    if lay and lay == play:
+        return 'morph'                  # continuity between sibling slides
+    if play == 'process':
+        return 'push'                   # keep travelling in the flow direction
+    if lay in ('timeline', 'toolshow', 'visual'):
+        return 'cinema'                 # showcase slides open cinematically
+    if groups >= 6:
+        return 'wipe'
+    return 'morph' if i % 2 else 'fade'
+
+
+def _brand_mentioned(text):
+    """Exact word/bigram brand match — substring tests misfire ('gpt' in
+    'egypt', 'meta' in 'metadata')."""
+    words = [re.sub(r'[^a-z0-9+-]', '', w) for w in (text or '').lower().split()]
+    for k, w in enumerate(words):
+        if w in BRANDS:
+            return True
+        if k + 1 < len(words) and w + ' ' + words[k + 1] in BRANDS:
+            return True
+    return False
+
+
+def entrance_plan(regions, gsizes, gtexts=None, roles=None, layout=None):
+    """Motion Director: each element's entrance comes from its semantic role
+    and the slide's layout archetype. Lines draw; timeline markers rise;
+    tools run the dot->line->card->logo showcase; KPIs pop; images breathe
+    in; comparison sides enter from their own side; grid cards stagger
+    directionally; bullets rise one by one.
+    Pre-upgrade manifests carry no roles/layout — geometry inference keeps
+    their tool pops and directional staggers alive."""
     n = len(regions or [])
     if not n:
         return []
-    fx = ['rise'] * n
+    roles = roles or [''] * n
 
     def dims(r):
         return r[2] - r[0], r[3] - r[1]
 
-    line_idx = set()
+    line_like = set()
     for i, r in enumerate(regions):
         w, h = dims(r)
         gt = (gtexts[i] if gtexts and i < len(gtexts) else '').lower()
-        if (w > 0.35 and h > 0 and w / max(h, 1e-3) > 6) or 'timeline_line' in gt:
-            line_idx.add(i)
-            fx[i] = 'draw'
-        elif any(t in gt for t in ('chatgpt', 'copilot', 'gemini', 'claude')):
-            fx[i] = 'tool'
-    others = [i for i in range(n) if i not in line_idx]
+        role = roles[i] if i < len(roles) else ''
+        if role == 'line' or (w > 0.35 and w / max(h, 1e-3) > 6) \
+                or 'timeline_line' in gt:
+            line_like.add(i)
+    others = [i for i in range(n) if i not in line_like]
+    band = gridlike = False
     if others:
         cys = [(regions[i][1] + regions[i][3]) / 2 for i in others]
-        band = (max(cys) - min(cys)) < 0.22       # one horizontal band
+        band = (max(cys) - min(cys)) < 0.22
         areas = [max(1e-4, dims(regions[i])[0] * dims(regions[i])[1])
                  for i in others]
         gridlike = len(others) >= 4 and max(areas) / min(areas) < 4
-        for i in others:
-            if fx[i] == 'tool':
-                continue
-            r = regions[i]
-            w, h = dims(r)
-            cx, cy = (r[0] + r[2]) / 2, (r[1] + r[3]) / 2
-            big = i < len(gsizes or []) and gsizes[i] > 1
-            gt = (gtexts[i] if gtexts and i < len(gtexts) else '').lower()
-            if w * h > 0.30:
-                fx[i] = 'fade'                    # containers breathe in
-            elif any(m in gt for m in ('basic', 'intermediate', 'advance')):
-                fx[i] = 'rise'                    # timeline markers
-            elif big and band:
-                fx[i] = 'slide-l'                 # flow chain, left to right
-            elif gridlike:
-                fx[i] = ('slide-l' if cx < 0.42 else
-                         'slide-r' if cx > 0.58 else
-                         'drop' if cy < 0.5 else 'rise')
-            else:
-                fx[i] = 'rise'                    # stacked bullets
+
+    fx = []
+    for i, r in enumerate(regions):
+        w, h = dims(r)
+        cx, cy = (r[0] + r[2]) / 2, (r[1] + r[3]) / 2
+        role = roles[i] if i < len(roles) else ''
+        gt = (gtexts[i] if gtexts and i < len(gtexts) else '').lower()
+        big = i < len(gsizes or []) and gsizes[i] > 1
+        if i in line_like:
+            fx.append('draw')
+        elif role in ('tool', 'marker', 'kpi') or (
+                role in ('', 'card', 'item') and _brand_mentioned(gt)):
+            # tools & timeline markers POP: springy scale + ripple ring,
+            # no rectangular outline (the element itself is the animation)
+            fx.append('pop')
+        elif role == 'container' or w * h > 0.30:
+            fx.append('fade')
+        elif role == 'image':
+            fx.append('image')
+        elif layout == 'comparison':
+            fx.append('slide-l' if cx < 0.5 else 'slide-r')
+        elif layout == 'process' or (not layout and big and band):
+            fx.append('slide-l')
+        elif role == 'card':
+            fx.append('flip')          # chip+bubble cards flip in (3D)
+        elif layout == 'grid' or (not layout and gridlike):
+            fx.append('slide-l' if cx < 0.42 else
+                      'slide-r' if cx > 0.58 else
+                      'drop' if cy < 0.5 else 'rise')
+        else:
+            fx.append('rise')
     return fx
+
+
+# ---------------------------------------------------- avatar expression AI
+
+_EXPR_CONCERN = ('warning', 'risk', 'problem', 'challenge', 'careful',
+                 'danger', 'threat', 'concern', 'avoid', 'mistake', 'error',
+                 'fail', 'difficult', 'limitation', 'caution')
+_EXPR_POSITIVE = ('increase', 'improve', 'grow', 'benefit', 'advantage',
+                  'great', 'faster', 'better', 'success', 'save', 'boost',
+                  'achiev', 'win', 'easier', 'smart', 'powerful', 'help')
+_EXPR_FOCUS = ('important', 'key', 'critical', 'must', 'remember',
+               'note that', 'focus', 'essential', 'core', 'main')
+_EXPR_WELCOME = ('welcome', 'hello', 'today we', "let's talk", 'introduc',
+                 'this session', 'in this video')
+
+def sentence_expression(text, is_first, is_last):
+    """Rule-based expression director: what face should the presenter make
+    while saying this sentence? Subtle, professional, context-aware."""
+    tl = text.lower().strip()
+    if tl.endswith('?'):
+        return 'question'
+    if is_first or any(w in tl for w in _EXPR_WELCOME):
+        return 'welcome'
+    if any(w in tl for w in _EXPR_CONCERN):
+        return 'concern'
+    if is_last or any(w in tl for w in ('in summary', 'to conclude',
+                                        'in conclusion', 'thank you')):
+        return 'confident'
+    if any(w in tl for w in _EXPR_POSITIVE):
+        return 'positive'
+    if any(w in tl for w in _EXPR_FOCUS):
+        return 'focused'
+    return 'neutral'
 
 
 def camera_track(t0, t1, reveals, regions, cinematic):
@@ -242,40 +328,45 @@ def build_timeline(project, state_urls, fps, width, height, progress_cb=None,
                   else None) or [''] * K
         reveals = []
         if K > 0 and N > 0:
-            # narration-driven timing: an element reveals at the sentence that
-            # BEST mentions it (token-overlap score, earliest decent match),
-            # scanning forward so cumulative build states stay in order
-            sent_idx = []
-            last = 0
+            # narration-driven timing over a FIXED reading order: each element
+            # takes the globally best-matching sentence; silent units (dots,
+            # containers, lines) never consume a sentence; monotonic reveal
+            # times come from a cascade clamp, so a script that mentions
+            # things out of reading order degrades to a smooth cascade
+            # instead of bunching everything at the slide end.
+            sent_t = []                     # matched sentence start or None
             for g in range(K):
                 toks = [w for w in re.findall(r'[a-z0-9]{4,}',
                                               (gtexts[g] if g < len(gtexts) else '').lower())
                         if w not in STOPWORDS][:12]
-                scores = []
-                for j in range(last, N):
-                    sl = sents[j]['text'].lower()
-                    scores.append(sum(1 for tok in toks if tok in sl))
                 idx = None
-                if scores and max(scores) > 0:
-                    thr = max(1.0, max(scores) * 0.5)
-                    for j, sc_ in enumerate(scores):
-                        if sc_ >= thr:
-                            idx = last + j
-                            break
-                if idx is None:
-                    idx = min(last + (1 if g else 0), N - 1)
-                sent_idx.append(idx)
-                last = idx
-            # unmatched elements cascade one-by-one, never all at once
+                if toks:
+                    scores = [sum(1 for tok in toks if tok in s['text'].lower())
+                              for s in sents]
+                    if max(scores) > 0:
+                        thr = max(1.0, max(scores) * 0.5)
+                        idx = next(j for j, sc_ in enumerate(scores)
+                                   if sc_ >= thr)
+                sent_t.append(sents[idx]['t0'] if idx is not None else None)
             t_rev = []
-            for g, j in enumerate(sent_idx):
-                tt = t_cursor + max(0.0, sents[j]['t0'] - 0.12)
+            for g, st_ in enumerate(sent_t):
+                tt = (t_cursor + max(0.0, st_ - 0.12)) if st_ is not None \
+                    else (t_rev[-1] + 0.55 if t_rev else t_cursor + 0.6)
                 if not t_rev:
                     tt = min(tt, t_cursor + 2.0)   # never open on an empty slide
                 elif tt < t_rev[-1] + 0.55:
                     tt = t_rev[-1] + 0.55
-                tt = min(tt, t_cursor + res['duration'] - 0.9)
                 t_rev.append(tt)
+            # end clamp + backward de-collision: when the cascade would pile
+            # up at the slide end, spread reveals backward with an adaptive
+            # gap so they stay strictly increasing (no jump-cut pile-ups)
+            t_end = t_cursor + res['duration'] - 0.9
+            min_gap = min(0.55, max(0.18,
+                                    (t_end - t_cursor - 0.6) / max(1, K)))
+            t_rev = [min(tt, t_end) for tt in t_rev]
+            for g in range(len(t_rev) - 2, -1, -1):
+                if t_rev[g] > t_rev[g + 1] - min_gap:
+                    t_rev[g] = max(t_cursor + 0.3, t_rev[g + 1] - min_gap)
             reveals = [{'t': round(tt, 3), 'state': g + 1}
                        for g, tt in enumerate(t_rev)]
         sentences = []
@@ -335,6 +426,10 @@ def build_timeline(project, state_urls, fps, width, height, progress_cb=None,
                 'words': [{'w': w['w'], 't0': round(t_cursor + w['t0'], 3),
                            't1': round(t_cursor + w['t1'], 3)} for w in sn['words']],
                 'keyword': kw,
+                'expr': sentence_expression(sn['text'],
+                                            is_first=(i == 0 and j == 0),
+                                            is_last=(i == n - 1 and
+                                                     j == len(sents) - 1)),
             })
         # each hit holds until shortly before the next one (or ~2.6s max)
         hits.sort(key=lambda h: h['t'])
@@ -344,7 +439,8 @@ def build_timeline(project, state_urls, fps, width, height, progress_cb=None,
         dur = res['duration']
         trans = sc.get('transition', 'auto')
         if trans == 'auto':
-            trans = auto_transition(i, n, K)
+            trans = (plan_transition(i, n, manifest) if manifest
+                     else auto_transition(i, n, K))
         regions = None
         if manifest and i < len(manifest):
             regions = manifest[i].get('regions')
@@ -352,11 +448,13 @@ def build_timeline(project, state_urls, fps, width, height, progress_cb=None,
         cams = camera_track(t_cursor, t_cursor + dur, reveals, regions, cinematic)
         # active element system: sentence-driven speech-visual synchronization
         actives = []
-        gsizes = (manifest[i].get('gsizes') if manifest and i < len(manifest)
-                  else None) or []
-        gtexts = (manifest[i].get('texts') if manifest and i < len(manifest)
-                  else None) or []
-        fxs = entrance_plan(regions or [], gsizes, gtexts=gtexts)
+        mi = manifest[i] if manifest and i < len(manifest) else {}
+        gsizes = mi.get('gsizes') or []
+        gtexts = mi.get('texts') or []
+        roles = mi.get('roles') or []
+        layout = mi.get('layout') or ''
+        fxs = entrance_plan(regions or [], gsizes, gtexts=gtexts,
+                            roles=roles, layout=layout)
         for r_ in reveals:
             gi = r_['state'] - 1
             if 0 <= gi < len(fxs):
@@ -382,17 +480,17 @@ def build_timeline(project, state_urls, fps, width, height, progress_cb=None,
                     w, h = reg[2] - reg[0], reg[3] - reg[1]
                     if w * h > 0.45:
                         continue          # containers/backdrops don't lift
-                    
-                    subTarget = 'card'
-                    if any(w in stext for w in ('step 1', 'step 2', 'step 3', 'step 4', 'provide a clear prompt', 'ai understands', 'ai processes', 'ai generates')):
-                        if any(w in stext for w in ('step 1:', 'step 2:', 'step 3:', 'step 4:', 'prompt.', 'information.', 'response.')) or len(sn['text'].split()) <= 6:
-                            subTarget = 'heading'
-                    elif any(w in gt for w in ('basic', 'intermediate', 'advance')):
-                        subTarget = 'marker'
-                    elif any(w in gt for w in ('chatgpt', 'copilot', 'gemini', 'claude')):
-                        subTarget = 'tool'
-                    elif any(w in stext for w in ('automate customer', 'analyze business', 'create smart', 'support hiring', 'provide instant', 'automate repetitive', 'predict future', 'faster email', 'recap of the', 'healthcare', 'it support', 'finance', 'manufacturing', 'saves time', 'improves productivity', 'reduces manual', 'supports better')):
-                        subTarget = 'bullet'
+                    role = roles[best_gi] if best_gi < len(roles) else 'card'
+                    subTarget = {
+                        'marker': 'marker', 'tool': 'tool', 'kpi': 'tool',
+                        'bullet': 'bullet', 'heading': 'heading',
+                    }.get(role, 'card')
+                    if role in ('line', 'container'):
+                        continue          # backbones/backdrops never lift
+                    if subTarget == 'card' and _brand_mentioned(gt):
+                        subTarget = 'tool'   # brand items: clean borderless pop
+                    if subTarget == 'card' and len(sn['text'].split()) <= 6:
+                        subTarget = 'heading'   # short intro line: light touch
 
                     a0 = max(t_cursor, sn['t0'] - 0.05)
                     a1 = min(slide_end - 0.1, sn['t1'] + 0.15)
@@ -427,19 +525,40 @@ def build_timeline(project, state_urls, fps, width, height, progress_cb=None,
                         'bbox': reg, 'state': r['state'], 'subTarget': 'card',
                         'cx': round(cx, 3), 'cy': round(cy, 3),
                         'gazeDir': gaze})
+        # reading order is sacred: an element is never shown (even as an
+        # emphasis crop) before its reveal. If the narration mentions it
+        # early, the emphasis simply starts when the element lands.
+        rev_t = {r['state']: r['t'] for r in reveals}
+        kept = []
+        for a in actives:
+            rt = rev_t.get(a['state'])
+            if rt is not None and a['t0'] < rt + 0.85:
+                a['t0'] = round(rt + 0.85, 3)     # after the entrance settles
+            if a['t1'] < a['t0'] + 0.5:
+                a['t1'] = round(a['t0'] + 0.5, 3)
+            if a['t0'] < t_cursor + dur - 0.6:
+                kept.append(a)
+        actives = kept
         tl_slides.append({
             't0': round(t_cursor, 3), 't1': round(t_cursor + dur, 3),
             'transition': trans, 'states': states,
             'reveals': reveals, 'sentences': sentences,
             'cams': cams, 'sweeps': [], 'actives': actives,
             'hits': hits, 'regions': regions or [],
-            'gsizes': gsizes,
+            'gsizes': gsizes, 'layout': layout, 'roles': roles,
         })
         all_audio.append(res['samples'])
         t_cursor += dur
     master = np.concatenate(all_audio) if all_audio else np.zeros(sr, dtype=np.float32)
+    aspect = None
+    if manifest:
+        for m in manifest:
+            if m.get('aspect'):
+                aspect = m['aspect']
+                break
     timeline = {
         'width': width, 'height': height, 'fps': fps,
+        'slideAspect': aspect,
         'total': round(t_cursor, 3),
         'subtitleStyle': project.get('subtitleStyle', 'professional'),
         'showSubtitles': project.get('showSubtitles', False),
@@ -582,8 +701,26 @@ def render_video(project, state_paths, outdir, progress_cb=None, manifest=None,
     pconf = project.get('presenter') or {}
     photoreal = (pconf.get('mode') == 'footage' and presenter_footage
                  and os.path.exists(presenter_footage))
+    # Preflight BEFORE the stage render decides the presenter path once and
+    # for all: if photoreal can't work, the stage renders WITH the animated
+    # avatar — the video must never end up with no presenter at all.
+    if photoreal:
+        import presenter as pres_mod
+        ok, why = pres_mod.preflight(presenter_footage)
+        if not ok:
+            photoreal = False
+            print(f'[render] photoreal presenter unavailable: {why}')
+            if progress_cb:
+                progress_cb('voice', 0.0,
+                            f'Photoreal presenter unavailable ({why}) — '
+                            f'falling back to the animated presenter')
 
-    state_urls = [['file://' + p for p in lst] for lst in state_paths]
+    # proper file:/// URIs (forward slashes, percent-encoded). Plain
+    # 'file://' + backslash-path breaks CSS url() on Windows — backslashes
+    # are CSS escapes — which made reveal/emphasis crops render empty.
+    import pathlib
+    state_urls = [[pathlib.Path(p).as_uri() for p in lst]
+                  for lst in state_paths]
     timeline, master, sr = build_timeline(project, state_urls, fps, width, height,
                                           progress_cb, manifest=manifest)
     if photoreal:
@@ -594,6 +731,12 @@ def render_video(project, state_paths, outdir, progress_cb=None, manifest=None,
         av_cfg = dict(timeline.get('avatar') or {})
         av_cfg['visible'] = True
         timeline['avatar'] = av_cfg
+
+    # mouth envelope from the VOICE ONLY — computed before the music bed is
+    # mixed in, so lips never move to background music during pauses
+    mouth = tts.mouth_envelope(master, sr, fps)
+    voice_path = os.path.join(outdir, 'voice.wav')
+    tts.write_wav(voice_path, master, sr)   # clean voice for Wav2Lip
 
     # ---- audio design: subtle music bed + UI sfx under the narration
     if project.get('audioDesign', True):
@@ -612,9 +755,24 @@ def render_video(project, state_paths, outdir, progress_cb=None, manifest=None,
             import traceback; traceback.print_exc()
     wav_path = os.path.join(outdir, 'narration.wav')
     tts.write_wav(wav_path, master, sr)
-    mouth = tts.mouth_envelope(master, sr, fps)
     with open(os.path.join(outdir, 'timeline.json'), 'w') as f:
         json.dump(timeline, f)
+
+    # ---- pre-render QC: fail fast on inconsistent inputs instead of
+    # producing a silently incomplete video
+    try:
+        import validator
+        issues = validator.validate_pre(state_paths, manifest, timeline)
+        for lvl, m in issues:
+            print(f'[qc:{lvl}] {m}')
+        fatal = [m for lvl, m in issues if lvl == 'fatal']
+        if fatal:
+            raise RuntimeError('Pre-render validation failed: ' +
+                               '; '.join(fatal))
+    except RuntimeError:
+        raise
+    except Exception:
+        import traceback; traceback.print_exc()
 
     total_frames = int(math.ceil(timeline['total'] * fps))
     out_path = os.path.join(outdir, 'video.mp4')
@@ -659,34 +817,69 @@ def render_video(project, state_paths, outdir, progress_cb=None, manifest=None,
         import presenter as pres
         stage_path = os.path.join(outdir, 'stage.mp4')
         os.replace(out_path, stage_path)
-        synced = os.path.join(outdir, 'presenter_synced.mp4')
-        try:
-            if progress_cb:
-                progress_cb('lipsync', 0, 'Lip-syncing your presenter (AI)…')
-            pres.lipsync(presenter_footage, wav_path, synced,
-                         progress_cb=progress_cb)
-            if progress_cb:
-                progress_cb('composite', 0.5, 'Compositing presenter…')
-            av = project.get('avatar', {})
-            segs = None
-            if project.get('smartPosition', True):
-                segs = presenter_segments(timeline, manifest, width, height,
-                                          default_x=av.get('x', 0.855),
-                                          size=av.get('size', 0.24))
+        av = project.get('avatar', {})
+        segs = None
+        if project.get('smartPosition', True):
+            segs = presenter_segments(timeline, manifest, width, height,
+                                      default_x=av.get('x', 0.855),
+                                      size=av.get('size', 0.24))
+
+        def _composite(presenter_mp4):
             pres.composite_presenter(
-                stage_path, synced, out_path, width, height,
+                stage_path, presenter_mp4, out_path, width, height,
                 pos_x=av.get('x', 0.855), pos_y=av.get('y', 0.80),
                 size=av.get('size', 0.24),
                 shape=pconf.get('shape', 'circle'),
                 zoom=float(pconf.get('zoom', 1.0)),
                 offset_y=float(pconf.get('offsetY', 0.0)),
                 segments=segs)
+
+        synced = os.path.join(outdir, 'presenter_synced.mp4')
+        try:
+            if progress_cb:
+                progress_cb('lipsync', 0, 'Lip-syncing your presenter (AI)…')
+            pres.lipsync(presenter_footage, voice_path, synced,
+                         progress_cb=progress_cb)
+            if progress_cb:
+                progress_cb('composite', 0.5, 'Compositing presenter…')
+            _composite(synced)
         except Exception as e:
             import traceback; traceback.print_exc()
-            os.replace(stage_path, out_path)  # fall back to stage-only video
-            if progress_cb:
-                progress_cb('render', 0.99,
-                            f'Presenter lip-sync failed ({e}); exported without presenter')
+            # Presenter must still appear: composite the raw (un-synced)
+            # footage loop rather than shipping a presenter-less video.
+            try:
+                if progress_cb:
+                    progress_cb('composite', 0.3,
+                                f'Lip-sync failed ({e}) — compositing presenter '
+                                f'without lip-sync')
+                raw_loop = os.path.join(outdir, 'presenter_raw.mp4')
+                pres.loop_silent(presenter_footage, timeline['total'], raw_loop)
+                _composite(raw_loop)
+            except Exception as e2:
+                import traceback; traceback.print_exc()
+                os.replace(stage_path, out_path)  # last resort: stage only
+                if progress_cb:
+                    progress_cb('render', 0.99,
+                                f'Presenter compositing failed ({e2}); '
+                                f'exported without presenter')
+        # confirm the presenter actually landed in the frame
+        if os.path.exists(stage_path) and os.path.exists(out_path):
+            try:
+                import validator
+                ok, msg = validator.verify_presenter_composited(
+                    stage_path, out_path, timeline, av, segs)
+                if not ok and progress_cb:
+                    progress_cb('composite', 0.95,
+                                f'Warning: presenter check failed — {msg}')
+            except Exception:
+                import traceback; traceback.print_exc()
+
+    # ---- post-render QC report (duration, resolution, audio, warnings)
+    try:
+        import validator
+        validator.validate_post(out_path, timeline, outdir)
+    except Exception:
+        import traceback; traceback.print_exc()
     if progress_cb:
         progress_cb('done', 1.0, 'Render complete')
     return out_path, timeline

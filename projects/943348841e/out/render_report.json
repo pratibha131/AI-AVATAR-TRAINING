@@ -1,0 +1,14 @@
+{
+ "ok": true,
+ "warnings": [],
+ "checks": {
+  "video": {
+   "fps": 30.0,
+   "frames": 3751.0,
+   "width": 1920,
+   "height": 1080,
+   "duration": 125.03333333333333
+  },
+  "audio_stream": true
+ }
+}

@@ -1,0 +1,93 @@
+{
+ "id": "943348841e",
+ "name": "Artificial Intelligence (AI) is technology that enables machines and software to learn, think, analyze, and make decisions like humans.",
+ "voice": "emily",
+ "subtitleStyle": "professional",
+ "showSubtitles": false,
+ "showKeywords": true,
+ "showProgress": false,
+ "cinematic": true,
+ "highlightSweeps": true,
+ "avatar": {
+  "id": "maya",
+  "x": 0.855,
+  "y": 0.8,
+  "size": 0.24,
+  "visible": true
+ },
+ "avatarOpts": {
+  "energy": 0.6,
+  "smile": 0.5,
+  "gesture": 0.5,
+  "eye": 0.75
+ },
+ "presenter": {
+  "mode": "photo",
+  "shape": "circle",
+  "zoom": 1,
+  "offsetY": 0,
+  "hasFootage": false,
+  "photoId": "7b4afef7"
+ },
+ "width": 1920,
+ "height": 1080,
+ "fps": 30,
+ "quality": "balanced",
+ "slides": [
+  {
+   "index": 0,
+   "title": "Artificial Intelligence",
+   "script": "Let's talk about Artificial Intelligence. MoS GURU. What is Artificial Intelligence (AI) ? Artificial Intelligence (AI) is technology that enables machines and software to learn, think, analyze, and make decisions like humans. AI helps people understand information, generate ideas, automate routine work, and make everyday tasks easier. Instead of replacing people, AI helps us become more productive.",
+   "voice": null,
+   "speed": 1,
+   "pause": 0.3,
+   "transition": "auto",
+   "n_states": 7,
+   "est": 24.5
+  },
+  {
+   "index": 1,
+   "title": "AI Workflow",
+   "script": "Let's talk about AI Workflow. MoS GURU. How AI works ? AI learns from large amounts of information available across the internet. Algorithms identify patterns and improve over time. Learning. Data. AI predicts, recommends, or automates actions. Decision.",
+   "voice": null,
+   "speed": 1,
+   "pause": 0.3,
+   "transition": "auto",
+   "n_states": 14,
+   "est": 16.7
+  },
+  {
+   "index": 2,
+   "title": "Evolution of AI",
+   "script": "Let's talk about Evolution of AI. MoS GURU. BASIC. INTERMEDIATE. ADVANCE. Meeting scheduling and summaries. Automating approvals (leave, finance). Get AI-powered suggestions to support better decisions, help doctors detect diseases faster with AI. AI for Business & Enterprise.",
+   "voice": null,
+   "speed": 1,
+   "pause": 0.3,
+   "transition": "auto",
+   "n_states": 16,
+   "est": 16.7
+  },
+  {
+   "index": 3,
+   "title": "AI Tools & Use Cases",
+   "script": "Let's talk about AI Tools & Use Cases. MoS GURU. AI Tools. Real World Use cases & Advantages. Healthcare : Detect diseases earlier , Support faster diagnosis. IT Support : Resolve issues quickly , Automate service requests. Finance: Detect fraud instantly , Analyze financial data. Manufacturing : Monitor equipment health , Improve product quality. Saves time and effort.",
+   "voice": null,
+   "speed": 1,
+   "pause": 0.3,
+   "transition": "auto",
+   "n_states": 18,
+   "est": 24.9
+  },
+  {
+   "index": 4,
+   "title": "MoS GURU",
+   "script": "Let's talk about MoS GURU. Continue Your AI Journey. Explore the Al Enterprise Portal. Discover AI tools, learning resources, and best practices. Stay updated with the latest AI initiatives and training. Explore more on AI. Support. Need Help? Request access to internal AI systems.",
+   "voice": null,
+   "speed": 1,
+   "pause": 0.3,
+   "transition": "auto",
+   "n_states": 11,
+   "est": 19.2
+  }
+ ]
+}

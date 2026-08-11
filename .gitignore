@@ -11,3 +11,7 @@ projects/*/out/*.wav
 projects/*/states/
 projects/*/thumbs/
 scratch/
+
+# large ML weights (downloaded via download_models.py)
+models/
+*.pth

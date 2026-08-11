@@ -60,12 +60,38 @@ Export tab when rendering completes. Reopen a project later with
 | File | Role |
 |---|---|
 | `app.py` | FastAPI server: upload, project store, render jobs, progress |
-| `slides.py` | pptx→PNG via LibreOffice; build-state engine (bullet reveals) |
+| `slides.py` | pptx→PNG (PowerPoint COM or LibreOffice); build-state engine; slide layout/role analyzer |
 | `tts.py` | Piper synthesis, sentence/word timing, mouth envelope |
-| `renderer.py` | Scene director: timeline builder + Chromium frame capture → ffmpeg |
-| `static/stage.html` | Deterministic 1080p compositor (seek(t) renders any instant) |
-| `static/avatar.js` | Parametric avatar library + facial rig |
+| `renderer.py` | AI Video Director: timeline builder + Chromium frame capture → ffmpeg |
+| `presenter.py` | Photoreal presenter: preflight, Wav2Lip lip-sync, compositing |
+| `validator.py` | Pre/post-render QC: state consistency, timeline sanity, presenter checks |
+| `static/stage.html` | Deterministic compositor (seek(t) is a pure function of time) |
+| `static/avatar.js` | Parametric avatar library + facial rig with expression director |
 | `static/index.html` | The editor UI |
+
+### Intelligence & reliability (v3)
+
+- **Slide analysis**: every slide is classified into a layout archetype
+  (timeline / toolshow / process / grid / comparison / bullets / visual) and
+  each narrative unit gets a semantic role (line, marker, tool, card, heading,
+  bullet, KPI, image, container). Entrances, transitions, and emphasis styles
+  are chosen from these — not from a fixed template.
+- **Relationship-aware transitions**: morph between sibling slides, cinematic
+  fades into section beats and showcases, directional pushes after process
+  slides, a slow zoom close on the finale.
+- **Speech-visual sync**: reveals and emphasis windows are matched to the
+  narration sentence that mentions each element; the element lifts/glows while
+  discussed and an emphasized element is held until its build state lands.
+- **Avatar expression director**: per-sentence expressions (welcome, focused,
+  positive, concern, question, confident) with eased gaze/gesture ramps.
+- **Guaranteed presenter**: photoreal mode preflights (model, torch, footage);
+  if unavailable the animated avatar renders instead; if lip-sync fails
+  mid-render the raw footage loop is composited — a video is never produced
+  without a presenter.
+- **Render QC**: pre-render validation (states/manifest alignment, image
+  decode, every element's final state reachable) fails fast instead of
+  producing an incomplete video; a post-render report lands in
+  `out/render_report.json` (also at `/api/project/{id}/report`).
 
 ## Upgrade path to photoreal avatars
 

@@ -6,4 +6,4 @@ url = 'https://github.com/anothermartz/Easy-Wav2Lip/releases/download/Prerequesi
 dst = os.path.join(here, 'models', 'wav2lip_gan.pth')
 print('downloading Wav2Lip weights…')
 urllib.request.urlretrieve(url, dst)
-print('done →', dst)
+print('done ->', dst)

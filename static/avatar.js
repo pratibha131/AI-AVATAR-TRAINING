@@ -128,31 +128,53 @@ function attireSVG(c){
   }
 }
 
+/* Expression director: subtle, professional facial targets per narration
+   context. brow>0 raises, brow<0 furrows; tilt in degrees; deltas blend in
+   with opts.exprK so expressions ease on with the sentence. */
+const EXPRESSIONS = {
+  welcome:  {smile: .25, brow: 1.2, tilt: 0,   energy: .15},
+  positive: {smile: .18, brow: .5,  tilt: 0,   energy: .05},
+  focused:  {smile:-.12, brow:-.9,  tilt: 0,   energy: 0},
+  concern:  {smile:-.28, brow:-1.6, tilt: 1.5, energy:-.05},
+  question: {smile: 0,   brow: 2.2, tilt: 2.2, energy: 0},
+  confident:{smile: .15, brow: .6,  tilt:-.5,  energy: .1},
+  neutral:  {smile: 0,   brow: 0,   tilt: 0,   energy: 0},
+  idle:     {smile: 0,   brow: 0,   tilt: 0,   energy:-.18},
+};
+
 /* Deterministic per-frame pose. t seconds; mouth 0..1; opts: {energy, smile,
-   gesture, eye, gazeDir, emphasis} each 0..1. Everything is a pure function of (t, mouth, opts). */
+   gesture, eye, gazeDir, emphasis, expr, exprK}. Everything is a pure
+   function of (t, mouth, opts). */
 function poseAvatar(root, t, mouth, opts){
-  const o = Object.assign({energy:.6, smile:.5, gesture:.5, eye:.7, gazeDir:'center'}, opts||{});
+  const o = Object.assign({energy:.6, smile:.5, gesture:.5, eye:.7,
+                           gazeDir:'center', expr:'neutral', exprK:0}, opts||{});
   const head = root.querySelector('.av-head');
   const body = root.querySelector('.av-body');
   const all  = root.querySelector('.av-all');
   const armL = root.querySelector('.av-armL');
   const armR = root.querySelector('.av-armR');
   if(!head) return;
-  const E = .4 + o.energy*.9;
+  const cl = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const ex = EXPRESSIONS[o.expr] || EXPRESSIONS.neutral;
+  const xk = cl(o.exprK||0, 0, 1);
+  const E = .4 + cl(o.energy + ex.energy*xk, 0, 1)*.9;
 
-  // Gaze & Head orientation toward content element or audience
+  // Gaze & Head orientation toward content element or audience.
+  // gk ramps 0..1 so head turns / gestures glide instead of snapping
+  // (defaults to 1 for callers that don't drive the ramp, e.g. the editor).
+  const gk = cl(o.gazeK != null ? o.gazeK : 1, 0, 1);
   let headTurn = 0, pupilX = 0, pupilY = 0;
   if(o.gazeDir === 'left'){
-    headTurn = -7.5; pupilX = -2.8; pupilY = 0.2;
+    headTurn = -7.5*gk; pupilX = -2.8*gk; pupilY = 0.2*gk;
   } else if(o.gazeDir === 'right'){
-    headTurn = 7.5; pupilX = 2.8; pupilY = 0.2;
+    headTurn = 7.5*gk; pupilX = 2.8*gk; pupilY = 0.2*gk;
   }
 
   // breathing + weight shift
   const breathe = Math.sin(t*2*Math.PI/3.6)* .8 * E;
   const sway    = Math.sin(t*2*Math.PI/7.3)* 1.1 * E * (.4+o.gesture);
   const bob     = Math.sin(t*2*Math.PI/2.9)* .7 * E + mouth*1.2;
-  const tilt    = headTurn + Math.sin(t*2*Math.PI/11.7)* 1.8 * E + Math.sin(t*1.31)*.5;
+  const tilt    = headTurn + ex.tilt*xk + Math.sin(t*2*Math.PI/11.7)* 1.8 * E + Math.sin(t*1.31)*.5;
   const lean    = (o.emphasis ? 2.5 : 0) + Math.sin(t*1.5)*0.5;
 
   all.setAttribute('transform', `translate(${sway.toFixed(2)} ${(lean*0.4).toFixed(2)})`);
@@ -160,28 +182,27 @@ function poseAvatar(root, t, mouth, opts){
   head.setAttribute('transform',
     `translate(0 ${(breathe+bob+lean).toFixed(2)}) rotate(${tilt.toFixed(2)} 100 110)`);
 
-  // Arms and Hand Gestures
-  let rotL = 0, rotR = 0, transL = 0, transR = 0;
+  // Arms and Hand Gestures — blend from the resting sway toward the gesture
+  // pose with gk so hands ease toward the content, never jump-cut
   const gCycle = Math.sin(t * 2.8);
+  const restL = Math.sin(t * 2.1) * 3, restR = -Math.sin(t * 2.1) * 3;
+  let tgtL = restL, tgtR = restR, tTrL = 0, tTrR = 0;
   if(o.gazeDir === 'right' || o.gestureMode === 'explain_right'){
     // Gesture right hand toward slide content
-    rotR = -32 + gCycle * 4;
-    transR = -6;
-    rotL = 4 + Math.sin(t * 1.5) * 2;
+    tgtR = -32 + gCycle * 4; tTrR = -6;
+    tgtL = 4 + Math.sin(t * 1.5) * 2;
   } else if(o.gazeDir === 'left' || o.gestureMode === 'explain_left'){
     // Gesture left hand toward slide content
-    rotL = 32 + gCycle * 4;
-    transL = -6;
-    rotR = -4 + Math.sin(t * 1.5) * 2;
+    tgtL = 32 + gCycle * 4; tTrL = -6;
+    tgtR = -4 + Math.sin(t * 1.5) * 2;
   } else if(o.emphasis){
     // Both hands gesture emphasis
-    rotL = 22 + gCycle * 3;
-    rotR = -22 - gCycle * 3;
-  } else {
-    // Natural resting posture sway
-    rotL = Math.sin(t * 2.1) * 3;
-    rotR = -Math.sin(t * 2.1) * 3;
+    tgtL = 22 + gCycle * 3;
+    tgtR = -22 - gCycle * 3;
   }
+  const rotL = restL + (tgtL - restL) * gk;
+  const rotR = restR + (tgtR - restR) * gk;
+  const transL = tTrL * gk, transR = tTrR * gk;
 
   // SVG attribute syntax: rotate about the shoulder pivot, then lift
   if(armL) armL.setAttribute('transform',
@@ -203,8 +224,8 @@ function poseAvatar(root, t, mouth, opts){
   if(pL){ pL.setAttribute('cx', 80+px); pL.setAttribute('cy', 95+py);
           pR.setAttribute('cx', 120+px); pR.setAttribute('cy', 95+py); }
 
-  // brows: raise with emphasis & speaking energy
-  const raise = mouth*2.6*E + (o.emphasis ? 2.0 : 0);
+  // brows: raise with emphasis, speaking energy & expression (negative = furrow)
+  const raise = mouth*2.6*E + (o.emphasis ? 2.0 : 0) + ex.brow*xk;
   root.querySelector('.av-browL').setAttribute('transform',`translate(0 ${-raise})`);
   root.querySelector('.av-browR').setAttribute('transform',`translate(0 ${-raise})`);
 
@@ -220,8 +241,8 @@ function poseAvatar(root, t, mouth, opts){
   root.querySelector('.av-tongue').setAttribute('cy', 126 + ry*.62);
   root.querySelector('.av-teeth').setAttribute('y', 126 - ry - 1.2);
 
-  // smile curvature + cheeks
-  const sm = o.smile*(1-m*.5);
+  // smile curvature + cheeks (expression-adjusted)
+  const sm = cl(o.smile + ex.smile*xk, 0, 1)*(1-m*.5);
   smileP.setAttribute('d', `M86 ${124-sm*2} q14 ${4+sm*9} 28 0`);
   const cheek = root.querySelector('.av-cheekL');
   if(cheek){ cheek.setAttribute('opacity', (sm*.35).toFixed(2));

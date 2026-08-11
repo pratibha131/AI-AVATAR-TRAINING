@@ -104,7 +104,11 @@ async def upload(file: UploadFile = File(...)):
     for i in range(n):
         inf = info[i] if i < len(info) else {'title': '', 'notes': '',
                                              'paragraphs': []}
-        script = slide_engine.draft_script(inf) if inf else ''
+        # draft narration in the same reading order the reveals will use
+        if manifest is not None and i < len(manifest):
+            script = slide_engine.draft_script_ordered(manifest[i], inf)
+        else:
+            script = slide_engine.draft_script(inf) if inf else ''
         proj['slides'].append({
             'index': i, 'title': inf.get('title') or f'Slide {i+1}',
             'script': script,
@@ -129,7 +133,24 @@ class ProjectUpdate(BaseModel):
 
 @app.get('/api/project/{pid}')
 def get_project(pid: str):
-    return load_project(pid)
+    proj = load_project(pid)
+    # self-heal: n_states drifts when build states are rebuilt out-of-band
+    try:
+        sp = os.path.join(pdir(pid), 'states.json')
+        if os.path.exists(sp):
+            with open(sp) as f:
+                states = json.load(f)
+            changed = False
+            for i, s in enumerate(states):
+                if i < len(proj['slides']) and \
+                        proj['slides'][i].get('n_states') != len(s):
+                    proj['slides'][i]['n_states'] = len(s)
+                    changed = True
+            if changed:
+                save_project(pid, proj)
+    except Exception:
+        traceback.print_exc()
+    return proj
 
 @app.post('/api/project/{pid}')
 def update_project(pid: str, upd: ProjectUpdate):
@@ -293,6 +314,12 @@ def _render_job(pid):
         # Motion Director: when the narration changed, rebuild the slide
         # build-states so elements reveal in the order the story tells them
         src = os.path.join(d, 'source.pptx')
+        with open(os.path.join(d, 'states.json')) as f:
+            states = json.load(f)
+        manifest = None
+        if os.path.exists(mpath):
+            with open(mpath) as f:
+                manifest = json.load(f)
         if os.path.exists(src):
             import hashlib
             scripts = [(s.get('script') or '') for s in proj.get('slides', [])]
@@ -302,7 +329,16 @@ def _render_job(pid):
             if os.path.exists(hpath):
                 with open(hpath) as f:
                     old = f.read().strip()
-            if hsh != old:
+            # rebuild when the narration changed OR the stored build is stale:
+            # misaligned state counts (old exporter silently dropped slides)
+            # or a pre-upgrade manifest without roles/layout metadata
+            stale = manifest is not None and (
+                len(manifest) != len(states) or
+                any(m.get('n_states') != len(s)
+                    for m, s in zip(manifest, states)) or
+                (len(manifest) > 0 and
+                 manifest[0].get('bver') != slide_engine.BUILD_VERSION))
+            if hsh != old or stale:
                 try:
                     cb('slides', 0, 'Choreographing slides to the narration…')
                     states_n, manifest_n = slide_engine.render_build_states(
@@ -313,14 +349,28 @@ def _render_job(pid):
                         json.dump(manifest_n, f)
                     with open(hpath, 'w') as f:
                         f.write(hsh)
+                    states, manifest = states_n, manifest_n
+                    # keep the editor preview honest: per-slide state counts
+                    # in project.json must match the rebuilt states
+                    for i, s in enumerate(states_n):
+                        if i < len(proj['slides']):
+                            proj['slides'][i]['n_states'] = len(s)
+                    save_project(pid, proj)
                 except Exception:
                     traceback.print_exc()   # keep previous states on failure
-        with open(os.path.join(d, 'states.json')) as f:
-            states = json.load(f)
-        manifest = None
-        if os.path.exists(mpath):
-            with open(mpath) as f:
-                manifest = json.load(f)
+                    cb('slides', 0, 'Slide choreography failed — '
+                                    'continuing with previous slide builds')
+        # reconcile any remaining states/manifest mismatch so legacy projects
+        # render (with degraded reveals) instead of aborting at pre-render QC
+        if manifest:
+            manifest = manifest[:len(states)]
+            for m, s in zip(manifest, states):
+                if m.get('n_states') != len(s):
+                    g = max(0, len(s) - 1)
+                    m['n_states'] = len(s)
+                    for k in ('regions', 'texts', 'roles', 'gsizes'):
+                        if isinstance(m.get(k), list):
+                            m[k] = m[k][:g]
         footage = os.path.join(d, 'presenter_footage.mp4')
         pconf = proj.get('presenter') or {}
         if pconf.get('mode') == 'photo' and pconf.get('photoId'):
@@ -379,6 +429,15 @@ def narration(pid: str):
     if not os.path.exists(p):
         raise HTTPException(404)
     return FileResponse(p, media_type='audio/wav')
+
+@app.get('/api/project/{pid}/report')
+def render_report(pid: str):
+    """Post-render QC report (duration/resolution/audio/presenter checks)."""
+    p = os.path.join(pdir(pid), 'out', 'render_report.json')
+    if not os.path.exists(p):
+        return {'ok': None, 'warnings': [], 'checks': {}}
+    with open(p) as f:
+        return JSONResponse(json.load(f))
 
 @app.get('/api/project/{pid}/timeline')
 def timeline(pid: str):

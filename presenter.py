@@ -49,13 +49,121 @@ W2L_FPS = 25
 IMG_SIZE = 96
 
 
+def preflight(footage_path):
+    """Can the photoreal pipeline actually run? Checked BEFORE the stage
+    render so a failure can fall back to the animated presenter instead of
+    shipping a video with no presenter at all. Returns (ok, reason)."""
+    if not os.path.exists(MODEL_PATH):
+        return False, ('Wav2Lip model not downloaded — '
+                       'run: python download_models.py')
+    try:
+        import torch  # noqa: F401
+    except Exception as e:
+        return False, f'missing dependency: {e}'
+    cap = cv2.VideoCapture(footage_path)
+    ok, _ = cap.read()
+    cap.release()
+    if not ok:
+        return False, 'presenter footage could not be decoded'
+    return True, ''
+
+
+def probe_video_size(video_path):
+    """(width, height) via OpenCV — no ffprobe dependency."""
+    cap = cv2.VideoCapture(video_path)
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    cap.release()
+    if w <= 0 or h <= 0:
+        raise RuntimeError(f'could not read video dimensions: {video_path}')
+    return w, h
+
+
+def loop_silent(footage_path, duration, out_path):
+    """Fallback presenter track: ping-pong loop the raw footage to the target
+    duration at 25fps, no lip-sync. Keeps the human presenter on screen even
+    when Wav2Lip fails mid-render."""
+    frames, src_fps = _read_frames(footage_path)
+    if not frames:
+        raise RuntimeError('could not read presenter footage')
+    idxs = [min(len(frames) - 1, int(round(i * src_fps / W2L_FPS)))
+            for i in range(int(len(frames) * W2L_FPS / src_fps) or 1)]
+    frames25 = [frames[i] for i in idxs] or frames
+    n = max(1, int(duration * W2L_FPS))
+    frames25 = _pingpong(frames25, n)
+    H, W = frames25[0].shape[:2]
+    tmp = out_path + '.tmp.mp4'
+    vw = cv2.VideoWriter(tmp, cv2.VideoWriter_fourcc(*'mp4v'), W2L_FPS, (W, H))
+    for f in frames25:
+        vw.write(f)
+    vw.release()
+    subprocess.run([FFMPEG_CMD, '-y', '-loglevel', 'error', '-i', tmp,
+                    '-c:v', 'libx264', '-crf', '20', '-preset', 'fast',
+                    '-pix_fmt', 'yuv420p', '-an', out_path], check=True)
+    os.remove(tmp)
+    return out_path
+
+
+def _load_wav_16k(path):
+    """Mono float32 at 16 kHz from a PCM wav — no librosa/numba needed."""
+    import wave
+    with wave.open(path, 'rb') as w:
+        sr = w.getframerate()
+        ch = w.getnchannels()
+        data = np.frombuffer(w.readframes(w.getnframes()),
+                             dtype=np.int16).astype(np.float32) / 32768.0
+    if ch > 1:
+        data = data.reshape(-1, ch).mean(axis=1)
+    if sr != SR:
+        n_out = int(len(data) * SR / sr)
+        data = np.interp(np.linspace(0, len(data) - 1, n_out),
+                         np.arange(len(data)), data).astype(np.float32)
+    return data
+
+
+def _mel_filterbank():
+    """Slaney-style mel filterbank matching librosa.filters.mel defaults
+    (the front-end Wav2Lip was trained with)."""
+    f_sp = 200.0 / 3.0
+    min_log_hz = 1000.0
+    min_log_mel = min_log_hz / f_sp
+    logstep = math.log(6.4) / 27.0
+
+    def hz2mel(f):
+        f = np.asarray(f, dtype=np.float64)
+        return np.where(f >= min_log_hz,
+                        min_log_mel + np.log(np.maximum(f, 1e-9) / min_log_hz) / logstep,
+                        f / f_sp)
+
+    def mel2hz(m):
+        m = np.asarray(m, dtype=np.float64)
+        return np.where(m >= min_log_mel,
+                        min_log_hz * np.exp(logstep * (m - min_log_mel)),
+                        m * f_sp)
+
+    mels = np.linspace(hz2mel(FMIN), hz2mel(FMAX), N_MELS + 2)
+    hz = mel2hz(mels)
+    bins = np.fft.rfftfreq(N_FFT, 1.0 / SR)
+    fb = np.zeros((N_MELS, len(bins)))
+    for i in range(N_MELS):
+        lo, c, hi = hz[i], hz[i + 1], hz[i + 2]
+        up = (bins - lo) / max(c - lo, 1e-9)
+        dn = (hi - bins) / max(hi - c, 1e-9)
+        fb[i] = np.clip(np.minimum(up, dn), 0, None) * (2.0 / (hi - lo))
+    return fb
+
+
 def _melspectrogram(wav):
-    import librosa
-    y = np.append(wav[0], wav[1:] - PREEMPH * wav[:-1])
-    D = librosa.stft(y=y, n_fft=N_FFT, hop_length=HOP, win_length=WIN)
-    mel_basis = librosa.filters.mel(sr=SR, n_fft=N_FFT, n_mels=N_MELS,
-                                    fmin=FMIN, fmax=FMAX)
-    S = np.dot(mel_basis, np.abs(D))
+    """Pure-NumPy STFT + slaney mel, Wav2Lip preprocessing parameters."""
+    y = np.append(wav[0], wav[1:] - PREEMPH * wav[:-1]).astype(np.float32)
+    pad = N_FFT // 2
+    y = np.pad(y, pad, mode='reflect')
+    win = (0.5 - 0.5 * np.cos(2 * np.pi * np.arange(WIN) / WIN)).astype(np.float32)
+    n_frames = 1 + (len(y) - N_FFT) // HOP
+    idx = np.arange(N_FFT)[None, :] + HOP * np.arange(n_frames)[:, None]
+    frames = y[idx] * win
+    D = np.abs(np.fft.rfft(frames, n=N_FFT, axis=1)).T
+    S = _mel_filterbank() @ D
     S = 20 * np.log10(np.maximum(1e-5, S)) - REF_DB
     S = np.clip((2 * 4.) * ((S - MIN_DB) / (-MIN_DB)) - 4., -4., 4.)
     return S
@@ -106,10 +214,10 @@ def _pingpong(frames, n):
 def lipsync(footage_path, wav_path, out_path, progress_cb=None, device='cpu',
             max_seconds=None):
     """Produce a W2L_FPS lip-synced presenter video (with narration audio)."""
-    import torch, librosa
+    import torch
     from wav2lip_model import load_wav2lip
 
-    wav, _ = librosa.load(wav_path, sr=SR)
+    wav = _load_wav_16k(wav_path)
     if max_seconds:
         wav = wav[:int(max_seconds * SR)]
     mel = _melspectrogram(wav)
@@ -213,12 +321,8 @@ def composite_presenter(stage_mp4, presenter_mp4, out_mp4, frame_w, frame_h,
                       f'clip((t-{t_j:.2f})/0.7,0,1)')
 
     # probe presenter dims for a centered square crop around the face
-    import json as _json
-    pr = subprocess.run(['ffprobe', '-v', 'quiet', '-select_streams', 'v:0',
-                         '-show_entries', 'stream=width,height', '-of', 'json',
-                         presenter_mp4], capture_output=True, text=True)
-    st = _json.loads(pr.stdout)['streams'][0]
-    pw, ph = st['width'], st['height']
+    # (via OpenCV — ffprobe is not guaranteed to exist alongside bundled ffmpeg)
+    pw, ph = probe_video_size(presenter_mp4)
     side = int(min(pw, ph) / max(0.4, zoom))
     cx = (pw - side) // 2
     cy = max(0, int((ph - side) // 2 + offset_y * ph))

@@ -11,15 +11,18 @@
   #vignette{position:absolute;inset:0;pointer-events:none;
     box-shadow:inset 0 0 120px rgba(10,20,40,.12)}
   /* ---------------- avatar ---------------- */
+  /* NOTE: no CSS transitions here — frames are captured at arbitrary
+     wall-clock intervals, so all motion must be a pure function of video
+     time t (computed in seek), never real-time CSS animation. */
   #avatarWrap{position:absolute;border-radius:50%;
     box-shadow:0 20px 50px rgba(10,16,32,.45),0 0 0 4px rgba(59,130,246,.85),0 0 32px rgba(59,130,246,.45),inset 0 0 12px rgba(255,255,255,.3);
     backdrop-filter:blur(8px);
-    will-change:transform,left,top;transition:left 0.75s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.75s cubic-bezier(0.34, 1.56, 0.64, 1);}
+    will-change:transform,left,top;}
   #avatarWrap svg{width:100%;height:100%;display:block;border-radius:50%}
   /* ---------------- subtitles ---------------- */
   #subWrap{position:absolute;left:50%;transform:translateX(-50%);
     text-align:center;transition:none;max-width:82%}
-  .sub-word{display:inline-block;margin:0 .18em;transition:transform 0.15s ease, color 0.15s ease}
+  .sub-word{display:inline-block;margin:0 .18em}
   /* styles */
   .st-professional #subWrap{bottom:4.2%;background:rgba(12,18,34,.90);
      padding:.58em 1.25em;border-radius:16px;backdrop-filter:blur(14px);
@@ -71,11 +74,13 @@
       background:linear-gradient(105deg,transparent 20%,rgba(255,255,255,.35) 50%,transparent 80%);
       background-size:250% 100%;border-radius:8px;mix-blend-mode:overlay"></div>
     <div id="dimLay" style="position:absolute;inset:0;pointer-events:none;opacity:0;
-      background:rgba(15,23,42,1);will-change:opacity;transition:opacity 0.35s ease"></div>
+      background:rgba(15,23,42,1);will-change:opacity"></div>
     <div id="activeCrop" style="position:absolute;pointer-events:none;opacity:0;
       border-radius:10px;will-change:transform,opacity;background-repeat:no-repeat"></div>
     <div id="revCrop" style="position:absolute;pointer-events:none;opacity:0;
       border-radius:10px;will-change:transform,opacity;background-repeat:no-repeat"></div>
+    <div id="popRing" style="position:absolute;pointer-events:none;opacity:0;
+      border-radius:50%;will-change:transform,opacity"></div>
   </div>
   <div id="vignette"></div>
   <div id="kwLayer"></div>
@@ -85,8 +90,11 @@
 </div>
 <script>
 let TL=null, W=1920, H=1080, avRoot=null, avPhoto=null;
+let CR={ox:0,oy:0,dw:1920,dh:1080};   // slide contain-rect inside the stage
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+// slide-normalized coords -> stage pixels (letterbox-aware)
+const bx=x=>CR.ox+x*CR.dw, by=y=>CR.oy+y*CR.dh;
 const eoc=x=>1-Math.pow(1-x,3);           // easeOutCubic
 const eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
 const eob=x=>{const c1=1.70158,c3=c1+1;   // easeOutBack (spring overshoot)
@@ -99,6 +107,27 @@ function initStage(tl){
   const st=$('stage'); st.style.width=W+'px'; st.style.height=H+'px';
   st.className='st-'+(tl.subtitleStyle||'professional');
   st.style.fontSize=(H/30)+'px';
+  // contain rect: where the (possibly non-16:9) slide actually sits inside
+  // the stage — every bbox-based overlay maps through this so element
+  // highlights & reveals land exactly on the element, never letterbox-offset
+  const asp=tl.slideAspect||(W/H);
+  if(W/H>asp){ CR={dh:H, dw:H*asp, oy:0, ox:(W-H*asp)/2}; }
+  else       { CR={dw:W, dh:W/asp, ox:0, oy:(H-W/asp)/2}; }
+  // deterministic presenter positioning: precompute per-slide side targets
+  // from the active-element windows (pure function of t — no CSS easing)
+  const defX=(tl.avatar&&tl.avatar.x!=null)?tl.avatar.x:0.855;
+  let prevX=defX;   // carry position across slides: no boundary teleports
+  TL.slides.forEach(sl=>{
+    const segs=[{t:sl.t0,x:defX,x0:prevX}];
+    (sl.actives||[]).forEach(a=>{
+      const tgt=a.cx>0.5?0.145:0.855;
+      const last=segs[segs.length-1];
+      if(Math.abs(tgt-last.x)>0.01)
+        segs.push({t:a.t0-0.2,x:tgt,x0:last.x});
+    });
+    prevX=segs[segs.length-1].x;
+    sl._pseg=segs;
+  });
   // preload all state images
   const urls=new Set(); TL.slides.forEach(s=>s.states.forEach(u=>urls.add(u)));
   urls.forEach(u=>{const i=new Image(); i.src=u;});
@@ -167,6 +196,11 @@ function applyTransition(el,type,p){       // incoming layer
       el.style.opacity=q;
       el.style.transform=`scale(${1.06-0.06*q})`;
       el.style.filter=`blur(${((1-q)*4).toFixed(2)}px)`; break;
+    case 'cinema':                       // section beat: slow cinematic open
+      el.style.opacity=q;
+      el.style.transform=`scale(${1.05-0.05*q})`;
+      el.style.filter=`brightness(${(1.08-0.08*q).toFixed(3)}) blur(${((1-q)*6).toFixed(2)}px)`;
+      break;
     case 'none':
       el.style.opacity=1; el.style.transform='none'; break;
     default: // fade
@@ -187,6 +221,11 @@ function applyOutgoing(el,type,p){          // previous slide during transition
       el.style.filter=`blur(${(q*3).toFixed(2)}px)`; break;
     case 'morph':
       el.style.transform=`scale(${1-q*0.04})`; el.style.opacity=1-q*0.25; break;
+    case 'cinema':
+      el.style.transform=`scale(${1-q*0.03})`;
+      el.style.opacity=1-q*0.55;
+      el.style.filter=`brightness(${(1-q*0.18).toFixed(3)}) blur(${(q*2.5).toFixed(2)}px)`;
+      break;
     default:
       el.style.transform='none'; el.style.opacity=1-q;
   }
@@ -246,58 +285,82 @@ function seek(t){
     const op=eoc(clamp(p/0.45,0,1));
     const [x0,y0,x1,y1]=popReg;
     const pad=8;
-    const px=x0*W-pad, py=y0*H-pad, pw=(x1-x0)*W+pad*2, ph=(y1-y0)*H+pad*2;
+    const px=bx(x0)-pad, py=by(y0)-pad,
+          pw=(x1-x0)*CR.dw+pad*2, ph=(y1-y0)*CR.dh+pad*2;
     revEl.style.left=px+'px'; revEl.style.top=py+'px';
     revEl.style.width=pw+'px'; revEl.style.height=ph+'px';
     revEl.style.backgroundImage=`url("${sl.states[state]}")`;
-    revEl.style.backgroundSize=`${W}px ${H}px`;
-    revEl.style.backgroundPosition=`${-px}px ${-py}px`;
-    let tx=0, ty=0, sc=1, mask='none', opacity=op, glow=(1-p);
+    revEl.style.backgroundSize=`${CR.dw}px ${CR.dh}px`;
+    revEl.style.backgroundPosition=`${(CR.ox-px).toFixed(1)}px ${(CR.oy-py).toFixed(1)}px`;
+    // All entrances are CLEAN: motion only, no borders, no glow boxes —
+    // the slide's own artwork does the talking.
+    let tx=0, ty=0, sc=1, mask='none', opacity=op;
+    let rot='', origin='50% 50%';
+    const ringEl=$('popRing');
+    let ringOn=false;
     switch(fx){
       case 'draw':                               // line draws start to end
         mask=`linear-gradient(90deg, black ${(p*130-15).toFixed(1)}%, transparent ${(p*130).toFixed(1)}%)`;
-        opacity=clamp(p/0.12,0,1); glow=0; break;
-      case 'tool':                               // Multi-stage tool showcase: Dot -> Line -> Card -> Logo -> Text
-        if(p < 0.25){
-          const dp = p / 0.25;
-          sc = eobS(dp); ty = (1 - dp) * 10; opacity = clamp(dp / 0.2, 0, 1);
-        } else if(p < 0.50){
-          const lp = (p - 0.25) / 0.25;
-          mask = `linear-gradient(90deg, black ${(lp*130-15).toFixed(1)}%, transparent ${(lp*130).toFixed(1)}%)`;
-          sc = 1.0; ty = 0; opacity = 1;
-        } else {
-          const cp = (p - 0.50) / 0.50;
-          const qc = eobS(cp);
-          ty = (1 - qc) * Math.min(24, ph * 0.2); sc = 0.96 + 0.04 * qc; opacity = 1;
+        opacity=clamp(p/0.12,0,1); break;
+      case 'tool':                               // legacy timelines: treat as pop
+      case 'pop': {                              // subtle springy pop + faint ripple
+        const q2=eob(clamp(p/0.7,0,1));
+        sc=0.72+0.28*q2;                         // small overshoot, settles 1
+        opacity=clamp(p/0.2,0,1);
+        ringOn=p<0.7;
+        if(ringOn){
+          const re=eoc(clamp(p/0.7,0,1));
+          const rd=Math.max(pw,ph)*(0.85+0.75*re);
+          ringEl.style.left=(px+pw/2-rd/2).toFixed(1)+'px';
+          ringEl.style.top=(py+ph/2-rd/2).toFixed(1)+'px';
+          ringEl.style.width=rd.toFixed(1)+'px';
+          ringEl.style.height=rd.toFixed(1)+'px';
+          ringEl.style.border=`${(1.6*(1-re)+0.3).toFixed(1)}px solid rgba(59,130,246,${(0.32*(1-re)).toFixed(3)})`;
+          ringEl.style.boxShadow=`0 0 ${(14*(1-re)).toFixed(0)}px rgba(59,130,246,${(0.16*(1-re)).toFixed(3)})`;
+          ringEl.style.opacity=(0.6*(1-re)).toFixed(3);
         }
-        glow = (1 - p); break;
+        break;
+      }
+      case 'flip': {                             // gentle 3D settle from below
+        const fq=eobS(p);
+        rot=`perspective(1100px) rotateX(${((1-fq)*24).toFixed(1)}deg) `;
+        origin='50% 100%';
+        ty=(1-fq)*Math.min(16,ph*0.15);
+        sc=0.975+0.025*fq;
+        opacity=eoc(clamp(p/0.4,0,1));
+        break;
+      }
       case 'slide-l':
-        tx=-(1-q)*Math.min(56,pw*0.18); sc=0.97+0.03*q; break;
+        tx=-(1-q)*Math.min(36,pw*0.12); sc=0.985+0.015*q; break;
       case 'slide-r':
-        tx=(1-q)*Math.min(56,pw*0.18); sc=0.97+0.03*q; break;
+        tx=(1-q)*Math.min(36,pw*0.12); sc=0.985+0.015*q; break;
       case 'drop':
-        ty=-(1-q)*Math.min(38,ph*0.28); sc=0.95+0.05*q; break;
+        ty=-(1-q)*Math.min(22,ph*0.18); sc=0.975+0.025*q; break;
       case 'fade':                               // containers breathe in
-        sc=0.985+0.015*eoc(p); glow=0; break;
-      default:                                   // rise (bullets, markers)
-        ty=(1-q)*Math.min(40,ph*0.3); sc=0.93+0.07*q;
+        sc=0.99+0.01*eoc(p); break;
+      case 'image':                              // images settle softly
+        sc=1.03-0.03*eoc(p); opacity=eoc(clamp(p/0.6,0,1)); break;
+      default:                                   // rise (bullets, headings)
+        ty=(1-q)*Math.min(22,ph*0.22); sc=0.97+0.03*q;
     }
+    if(!ringOn) ringEl.style.opacity=0;
     revEl.style.webkitMaskImage=mask;
-    revEl.style.transform=`translate(${tx.toFixed(2)}px,${ty.toFixed(2)}px) scale(${sc.toFixed(4)})`;
+    revEl.style.transformOrigin=origin;
+    revEl.style.transform=`${rot}translate(${tx.toFixed(2)}px,${ty.toFixed(2)}px) scale(${sc.toFixed(4)})`;
     revEl.style.opacity=opacity.toFixed(3);
-    revEl.style.boxShadow= glow<=0 ? 'none' :
-      `0 ${(16*glow+3).toFixed(1)}px ${(38*glow+7).toFixed(1)}px rgba(15,23,42,${(0.3*glow).toFixed(3)}),`+
-      `0 0 0 ${(1.8*glow).toFixed(2)}px rgba(59,130,246,${(0.55*glow).toFixed(3)}),`+
-      `0 0 ${(28*glow).toFixed(1)}px rgba(59,130,246,${(0.34*glow).toFixed(3)})`;
-  } else { revEl.style.opacity=0; revEl.style.webkitMaskImage='none'; }
+    revEl.style.boxShadow='none';
+  } else { revEl.style.opacity=0; revEl.style.webkitMaskImage='none';
+           $('popRing').style.opacity=0; }
 
   // ---- cinematic camera (AI cinematography)
   const cam=cameraAt(sl,t);
   const cw=$('camWrap');
   {
     const S=cam.s;
+    // focus point comes in slide-normalized coords: map through contain rect
+    const fx=bx(cam.cx)/W, fy=by(cam.cy)/H;
     const maxT=(S-1)/2;                      // keep edges hidden
-    let tx=(0.5-cam.cx)*S, ty=(0.5-cam.cy)*S;
+    let tx=(0.5-fx)*S, ty=(0.5-fy)*S;
     tx=clamp(tx,-maxT,maxT); ty=clamp(ty,-maxT,maxT);
     cw.style.transform=`translate(${(tx*W).toFixed(2)}px,${(ty*H).toFixed(2)}px) scale(${S.toFixed(4)})`;
   }
@@ -314,7 +377,7 @@ function seek(t){
   let gazeDir = 'center';
   let gestureMode = 'rest';
   let emphasis = false;
-  let targetXFrac = (TL.avatar && TL.avatar.x != null) ? TL.avatar.x : 0.855;
+  let gazeK = 0;         // eased ramp so gaze/gestures never snap
 
   if(act){
     const [x0,y0,x1,y1]=act.bbox;
@@ -323,14 +386,13 @@ function seek(t){
     const pin=clamp((t-(act.t0-0.2))/0.35,0,1);
     const pout=clamp((act.t1+0.3-t)/0.35,0,1);
     const k=eio(Math.min(pin,pout));
+    gazeK = k;
 
-    // Presenter intelligent positioning & gaze
+    // Presenter gaze & gesture toward the discussed element
     if(cx > 0.5){
-      targetXFrac = 0.145;
       gazeDir = 'right';
       gestureMode = 'explain_right';
     } else {
-      targetXFrac = 0.855;
       gazeDir = 'left';
       gestureMode = 'explain_left';
     }
@@ -339,37 +401,31 @@ function seek(t){
 
     // Spotlight & Active Crop Highlight
     if(area<0.45 && (y1-y0)<0.85 && (x1-x0)<0.90 && k>0.001){
-      dimEl.style.opacity=(0.14*k).toFixed(3);
-      const pad=7;
-      const px=x0*W-pad, py=y0*H-pad, pw=(x1-x0)*W+pad*2, ph=(y1-y0)*H+pad*2;
+      // TEXT-ONLY emphasis: the exact words being spoken pop subtly —
+      // no borders, no cards, no glow boxes; just the text a touch closer
+      // and brighter over a gently dimmed slide. Feathered edges so the
+      // crop never reads as a rectangle.
+      dimEl.style.opacity=(0.12*k).toFixed(3);
+      const pad=12;
+      const px=bx(x0)-pad, py=by(y0)-pad,
+            pw=(x1-x0)*CR.dw+pad*2, ph=(y1-y0)*CR.dh+pad*2;
       acEl.style.left=px+'px'; acEl.style.top=py+'px';
       acEl.style.width=pw+'px'; acEl.style.height=ph+'px';
       acEl.style.backgroundImage=`url("${sl.states[Math.max(state,act.state)]}")`;
-      acEl.style.backgroundSize=`${W}px ${H}px`;
-      acEl.style.backgroundPosition=`${-px}px ${-py}px`;
+      acEl.style.backgroundSize=`${CR.dw}px ${CR.dh}px`;
+      acEl.style.backgroundPosition=`${(CR.ox-px).toFixed(1)}px ${(CR.oy-py).toFixed(1)}px`;
+      acEl.style.webkitMaskImage='radial-gradient(farthest-side, black 78%, transparent 100%)';
       
       const subTarget = act.subTarget || 'card';
-      let liftPx = -8, scaleAmt = 0.04, glowRad = 28, borderW = 2.2, bGrad = 'rgba(59,130,246,0.85)';
-      
-      if(subTarget === 'heading'){
-        liftPx = -5; scaleAmt = 0.03; glowRad = 24; borderW = 2.0;
-      } else if(subTarget === 'marker'){
-        liftPx = -9; scaleAmt = 0.05; glowRad = 32; borderW = 2.5;
-      } else if(subTarget === 'tool'){
-        liftPx = -9; scaleAmt = 0.045; glowRad = 36; borderW = 2.5;
-      } else if(subTarget === 'bullet'){
-        liftPx = -5; scaleAmt = 0.02; glowRad = 20; borderW = 1.8;
+      let liftPx = -3, scaleAmt = 0.025, bright = 0.07;
+      if(subTarget === 'marker' || subTarget === 'tool'){
+        liftPx = -6; scaleAmt = 0.05; bright = 0.09;
       }
-
       const sc = 1 + scaleAmt * k, ty = liftPx * k;
-      const pulse = 1 + 0.16 * Math.sin((t - act.t0) * 3.1);   // breathing glow
       acEl.style.transform = `translateY(${ty.toFixed(2)}px) scale(${sc.toFixed(4)})`;
       acEl.style.opacity = k.toFixed(3);
-      acEl.style.boxShadow =
-        `0 ${(16*k).toFixed(1)}px ${(42*k).toFixed(1)}px rgba(15,23,42,${(0.38*k).toFixed(3)}),`+
-        `0 0 0 ${(borderW*k).toFixed(2)}px ${bGrad},`+
-        `0 0 ${(glowRad*k*pulse).toFixed(1)}px rgba(59,130,246,${(0.48*k*pulse).toFixed(3)})`;
-      acEl.style.filter = `brightness(${(1+0.06*k).toFixed(3)}) contrast(${(1+0.03*k).toFixed(3)})`;
+      acEl.style.boxShadow = 'none';
+      acEl.style.filter = `brightness(${(1+bright*k).toFixed(3)}) contrast(${(1+0.03*k).toFixed(3)})`;
     } else { dimEl.style.opacity=0; acEl.style.opacity=0; }
   } else { dimEl.style.opacity=0; acEl.style.opacity=0; }
   $('sweep').style.opacity=0;
@@ -438,11 +494,25 @@ function seek(t){
   } else kl.innerHTML='';
 
   // ---- avatar positioning & rig update
+  // position is a pure function of t: ease between precomputed side targets
+  // (CSS transitions would animate in wall-clock time and break determinism)
   const wrap=$('avatarWrap');
   if(wrap && wrap.style.display!=='none'){
     const d=((TL.avatar||{}).size||0.24)*H;
-    wrap.style.left = (targetXFrac * W - d/2).toFixed(1) + 'px';
+    const segs=sl._pseg||[];
+    let cur=null;
+    for(const sg of segs){ if(sg.t<=t) cur=sg; else break; }
+    let xf=(TL.avatar&&TL.avatar.x!=null)?TL.avatar.x:0.855;
+    if(cur){
+      const ease=eio(clamp((t-cur.t)/0.7,0,1));
+      xf=cur.x0+(cur.x-cur.x0)*ease;
+    }
+    wrap.style.left=(xf*W - d/2).toFixed(1)+'px';
   }
+
+  // current sentence drives the presenter's facial expression
+  let curSn=null;
+  for(const sn of sl.sentences) if(t>=sn.t0-0.1&&t<sn.t1+0.3){curSn=sn;break;}
 
   if(avRoot){
     let m=0;
@@ -457,10 +527,16 @@ function seek(t){
           m=clamp(m,0,1); break;
         }
     }
+    const exprK=curSn?eio(Math.min(
+      clamp((t-(curSn.t0-0.1))/0.5,0,1),
+      clamp(((curSn.t1+0.3)-t)/0.3,0,1))):0;   // symmetric ease in AND out
     const opts = Object.assign({}, TL.avatarOpts||{}, {
       gazeDir: gazeDir,
       gestureMode: gestureMode,
-      emphasis: emphasis
+      emphasis: emphasis,
+      gazeK: gazeK,
+      expr: curSn?(curSn.expr||'neutral'):'idle',
+      exprK: exprK
     });
     poseAvatar(avRoot,t,m,opts);
   }

@@ -22,7 +22,7 @@
   "eye": 0.8
  },
  "presenter": {
-  "mode": "animated",
+  "mode": "photo",
   "shape": "circle",
   "zoom": 1,
   "offsetY": 0,
@@ -42,7 +42,7 @@
    "speed": 1,
    "pause": 0.3,
    "transition": "auto",
-   "n_states": 5,
+   "n_states": 6,
    "est": 24.9
   },
   {
@@ -53,7 +53,7 @@
    "speed": 1,
    "pause": 0.3,
    "transition": "auto",
-   "n_states": 9,
+   "n_states": 17,
    "est": 47.7
   },
   {
@@ -64,7 +64,7 @@
    "speed": 1,
    "pause": 0.3,
    "transition": "auto",
-   "n_states": 9,
+   "n_states": 18,
    "est": 42.0
   },
   {
@@ -75,7 +75,7 @@
    "speed": 1,
    "pause": 0.3,
    "transition": "auto",
-   "n_states": 9,
+   "n_states": 25,
    "est": 42.0
   },
   {
@@ -86,7 +86,7 @@
    "speed": 1,
    "pause": 0.3,
    "transition": "auto",
-   "n_states": 7,
+   "n_states": 11,
    "est": 23.2
   }
  ]
