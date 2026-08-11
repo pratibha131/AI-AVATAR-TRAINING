@@ -1,0 +1,387 @@
+[
+  {
+    "index": 0,
+    "title": "Artificial Intelligence",
+    "paragraphs": [
+      {
+        "text": "MoS GURU",
+        "shape_id": 8,
+        "para_idx": 0
+      },
+      {
+        "text": "What is Artificial Intelligence (AI) ?",
+        "shape_id": 9,
+        "para_idx": 0
+      },
+      {
+        "text": "Artificial Intelligence (AI) is technology that enables machines and software to learn, think, analyze, and make decisions like humans.",
+        "shape_id": 7,
+        "para_idx": 0
+      },
+      {
+        "text": "AI helps people understand information, generate ideas, automate routine work, and make everyday tasks easier.",
+        "shape_id": 7,
+        "para_idx": 1
+      },
+      {
+        "text": "Instead of replacing people, AI helps us become more productive.",
+        "shape_id": 7,
+        "para_idx": 2
+      }
+    ],
+    "notes": ""
+  },
+  {
+    "index": 1,
+    "title": "AI Workflow",
+    "paragraphs": [
+      {
+        "text": "MoS GURU",
+        "shape_id": 11,
+        "para_idx": 0
+      },
+      {
+        "text": "How AI works ?",
+        "shape_id": 12,
+        "para_idx": 0
+      },
+      {
+        "text": "AI learns from large amounts of information available across the internet",
+        "shape_id": 14,
+        "para_idx": 0
+      },
+      {
+        "text": "Algorithms identify patterns and improve over time.",
+        "shape_id": 16,
+        "para_idx": 0
+      },
+      {
+        "text": "Learning",
+        "shape_id": 15,
+        "para_idx": 0
+      },
+      {
+        "text": "Data",
+        "shape_id": 13,
+        "para_idx": 0
+      },
+      {
+        "text": "AI predicts, recommends, or automates actions.",
+        "shape_id": 18,
+        "para_idx": 0
+      },
+      {
+        "text": "Decision",
+        "shape_id": 17,
+        "para_idx": 0
+      },
+      {
+        "text": "How users need to work with AI?",
+        "shape_id": 19,
+        "para_idx": 0
+      },
+      {
+        "text": "AI Processes the Information",
+        "shape_id": 25,
+        "para_idx": 0
+      },
+      {
+        "text": "AI Generates a Response",
+        "shape_id": 27,
+        "para_idx": 0
+      },
+      {
+        "text": "AI Understands the Prompt",
+        "shape_id": 23,
+        "para_idx": 0
+      },
+      {
+        "text": "Provide a Clear Prompt",
+        "shape_id": 21,
+        "para_idx": 0
+      },
+      {
+        "text": "Provide a Clear Prompt",
+        "shape_id": 9,
+        "para_idx": 0
+      },
+      {
+        "text": "It identifies relevant context, relationships, and knowledge to understand your request.",
+        "shape_id": 26,
+        "para_idx": 0
+      },
+      {
+        "text": "Based on its analysis, AI creates a relevant answer, suggestion, or solution.",
+        "shape_id": 28,
+        "para_idx": 0
+      },
+      {
+        "text": "AI Generates a Response",
+        "shape_id": 20,
+        "para_idx": 0
+      },
+      {
+        "text": "Describe your question or task in simple and specific language.",
+        "shape_id": 22,
+        "para_idx": 0
+      },
+      {
+        "text": "AI reads your input and analyzes it using trained models and patterns.",
+        "shape_id": 24,
+        "para_idx": 0
+      }
+    ],
+    "notes": ""
+  },
+  {
+    "index": 2,
+    "title": "Evolution of AI",
+    "paragraphs": [
+      {
+        "text": "MoS GURU",
+        "shape_id": 16,
+        "para_idx": 0
+      },
+      {
+        "text": "BASIC",
+        "shape_id": 18,
+        "para_idx": 0
+      },
+      {
+        "text": "INTERMEDIATE",
+        "shape_id": 19,
+        "para_idx": 0
+      },
+      {
+        "text": "ADVANCE",
+        "shape_id": 20,
+        "para_idx": 0
+      },
+      {
+        "text": "Meeting scheduling and summaries",
+        "shape_id": 21,
+        "para_idx": 0
+      },
+      {
+        "text": "Automating approvals (leave, finance)",
+        "shape_id": 22,
+        "para_idx": 0
+      },
+      {
+        "text": "Get AI-powered suggestions to support better decisions, help doctors detect diseases faster with AI",
+        "shape_id": 23,
+        "para_idx": 0
+      },
+      {
+        "text": "AI for Business & Enterprise",
+        "shape_id": 24,
+        "para_idx": 0
+      },
+      {
+        "text": "Automate customer support with AI chat assistants",
+        "shape_id": 25,
+        "para_idx": 0
+      },
+      {
+        "text": "Analyze business data to find useful insights",
+        "shape_id": 25,
+        "para_idx": 1
+      },
+      {
+        "text": "Create smart reports and interactive dashboards",
+        "shape_id": 25,
+        "para_idx": 2
+      },
+      {
+        "text": "Support hiring, onboarding, and HR tasks",
+        "shape_id": 25,
+        "para_idx": 3
+      },
+      {
+        "text": "Provide instant IT help and troubleshooting",
+        "shape_id": 25,
+        "para_idx": 4
+      },
+      {
+        "text": "Automate repetitive business processes",
+        "shape_id": 26,
+        "para_idx": 0
+      },
+      {
+        "text": "Predict future trends and business outcomes",
+        "shape_id": 26,
+        "para_idx": 1
+      },
+      {
+        "text": "Faster email drafting",
+        "shape_id": 26,
+        "para_idx": 2
+      },
+      {
+        "text": "Recap of the meetings with downloadable forms.",
+        "shape_id": 26,
+        "para_idx": 3
+      }
+    ],
+    "notes": ""
+  },
+  {
+    "index": 3,
+    "title": "AI Tools & Use Cases",
+    "paragraphs": [
+      {
+        "text": "MoS GURU",
+        "shape_id": 11,
+        "para_idx": 0
+      },
+      {
+        "text": "AI Tools",
+        "shape_id": 12,
+        "para_idx": 0
+      },
+      {
+        "text": "Real World Use cases & Advantages",
+        "shape_id": 17,
+        "para_idx": 0
+      },
+      {
+        "text": "Healthcare : Detect diseases earlier , Support faster diagnosis",
+        "shape_id": 21,
+        "para_idx": 0
+      },
+      {
+        "text": "IT Support : Resolve issues quickly , Automate service requests",
+        "shape_id": 21,
+        "para_idx": 1
+      },
+      {
+        "text": "Finance: Detect fraud instantly , Analyze financial data",
+        "shape_id": 21,
+        "para_idx": 2
+      },
+      {
+        "text": "Manufacturing : Monitor equipment health , Improve product quality",
+        "shape_id": 21,
+        "para_idx": 3
+      },
+      {
+        "text": "Saves time and effort",
+        "shape_id": 21,
+        "para_idx": 4
+      },
+      {
+        "text": "Improves productivity",
+        "shape_id": 21,
+        "para_idx": 5
+      },
+      {
+        "text": "Reduces manual work",
+        "shape_id": 21,
+        "para_idx": 6
+      },
+      {
+        "text": "Supports better decision-making",
+        "shape_id": 21,
+        "para_idx": 7
+      },
+      {
+        "text": "CHATGPT",
+        "shape_id": 13,
+        "para_idx": 0
+      },
+      {
+        "text": "COPILOT",
+        "shape_id": 14,
+        "para_idx": 0
+      },
+      {
+        "text": "GEMINI",
+        "shape_id": 15,
+        "para_idx": 0
+      },
+      {
+        "text": "CLAUDE",
+        "shape_id": 16,
+        "para_idx": 0
+      },
+      {
+        "text": "Productivity & Microsoft integration",
+        "shape_id": 23,
+        "para_idx": 0
+      },
+      {
+        "text": "Research & knowledge assistance",
+        "shape_id": 24,
+        "para_idx": 0
+      },
+      {
+        "text": "Document analysis & writing assistance",
+        "shape_id": 25,
+        "para_idx": 0
+      },
+      {
+        "text": "Content creation & summarization",
+        "shape_id": 22,
+        "para_idx": 0
+      }
+    ],
+    "notes": ""
+  },
+  {
+    "index": 4,
+    "title": "MoS GURU",
+    "paragraphs": [
+      {
+        "text": "Continue Your AI Journey",
+        "shape_id": 7,
+        "para_idx": 0
+      },
+      {
+        "text": "Explore the Al Enterprise Portal",
+        "shape_id": 15,
+        "para_idx": 0
+      },
+      {
+        "text": "Discover AI tools, learning resources, and best practices.",
+        "shape_id": 15,
+        "para_idx": 2
+      },
+      {
+        "text": "Stay updated with the latest AI initiatives and training.",
+        "shape_id": 15,
+        "para_idx": 3
+      },
+      {
+        "text": "Explore more on AI",
+        "shape_id": 15,
+        "para_idx": 5
+      },
+      {
+        "text": "Support",
+        "shape_id": 16,
+        "para_idx": 0
+      },
+      {
+        "text": "Need Help?",
+        "shape_id": 16,
+        "para_idx": 2
+      },
+      {
+        "text": "Request access to internal AI systems.",
+        "shape_id": 16,
+        "para_idx": 3
+      },
+      {
+        "text": "Schedule a team deep-dive training session.",
+        "shape_id": 16,
+        "para_idx": 4
+      },
+      {
+        "text": "Contact us at:",
+        "shape_id": 16,
+        "para_idx": 5
+      }
+    ],
+    "notes": ""
+  }
+]

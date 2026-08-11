@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lumen Studio — AI Avatar Training Videos</title>
+<script src="avatar.js"></script>
+<style>
+:root{
+  --bg:#0c0f16; --bg2:#12161f; --panel:#171c28; --panel2:#1d2432;
+  --line:#262e40; --txt:#e6eaf2; --dim:#8b94a8; --acc:#4d8dff; --acc2:#7cc4ff;
+  --ok:#3ecf8e; --warn:#ffb74d;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font:14px/1.45 'Inter','Segoe UI',system-ui,sans-serif;height:100vh;overflow:hidden}
+button{font:inherit;border:0;cursor:pointer;border-radius:9px}
+input,select,textarea{font:inherit;color:var(--txt);background:var(--bg2);
+  border:1px solid var(--line);border-radius:9px;padding:.45em .7em;outline:none}
+textarea:focus,input:focus,select:focus{border-color:var(--acc)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#2b3550;border-radius:5px}
+.btn{background:var(--panel2);color:var(--txt);padding:.55em 1.1em}
+.btn:hover{background:#242d40}
+.btn.pri{background:linear-gradient(135deg,#3b7bfd,#5e9bff);color:#fff;font-weight:600}
+.btn.pri:hover{filter:brightness(1.1)}
+.hidden{display:none!important}
+/* ---------- landing ---------- */
+#landing{height:100vh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:26px;background:
+  radial-gradient(ellipse at 50% -10%, #1b2c55 0%, transparent 55%),
+  radial-gradient(ellipse at 85% 110%, #14304a 0%, transparent 50%), var(--bg)}
+#landing h1{font-size:42px;margin:0;font-weight:800;letter-spacing:-.02em}
+#landing h1 em{font-style:normal;background:linear-gradient(90deg,#6aa5ff,#9ecbff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#landing p.sub{color:var(--dim);max-width:620px;text-align:center;margin:0;font-size:16px}
+#drop{width:min(680px,88vw);border:2px dashed #33415f;border-radius:22px;
+  padding:56px 30px;text-align:center;background:rgba(23,28,40,.6);cursor:pointer;
+  transition:.2s}
+#drop:hover,#drop.over{border-color:var(--acc);background:rgba(30,40,64,.7)}
+#drop .big{font-size:19px;font-weight:600}
+.feat{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;max-width:900px}
+.feat div{background:var(--panel);border:1px solid var(--line);padding:.65em 1.1em;
+  border-radius:12px;color:var(--dim);font-size:13px}
+/* ---------- app shell ---------- */
+#app{display:grid;grid-template-rows:56px 1fr;height:100vh}
+#topbar{display:flex;align-items:center;gap:14px;background:var(--panel);
+  border-bottom:1px solid var(--line);padding:0 16px}
+#topbar .logo{font-weight:800;font-size:16px}
+#topbar .logo em{font-style:normal;color:var(--acc2)}
+#pname{background:transparent;border:1px solid transparent;font-weight:600;min-width:220px}
+#pname:hover{border-color:var(--line)}
+#main{display:grid;grid-template-columns:224px 1fr 332px;min-height:0}
+/* timeline rail */
+#rail{background:var(--bg2);border-right:1px solid var(--line);overflow-y:auto;padding:12px}
+#rail h3{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);margin:2px 4px 10px}
+.thumb{position:relative;border:2px solid var(--line);border-radius:10px;overflow:hidden;
+  margin-bottom:12px;cursor:pointer;transition:.15s;background:#fff}
+.thumb img{width:100%;display:block}
+.thumb.sel{border-color:var(--acc);box-shadow:0 0 0 3px rgba(77,141,255,.25)}
+.thumb .n{position:absolute;top:6px;left:6px;background:rgba(10,14,24,.8);color:#fff;
+  font-size:11px;font-weight:700;padding:2px 8px;border-radius:7px}
+.thumb .d{position:absolute;bottom:6px;right:6px;background:rgba(10,14,24,.8);color:var(--acc2);
+  font-size:11px;padding:2px 7px;border-radius:7px}
+/* center */
+#center{display:flex;flex-direction:column;min-width:0;background:
+  radial-gradient(ellipse at 50% 0%, #131a2b 0%, var(--bg) 60%)}
+#stageBox{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:18px}
+#stageScale{position:relative;box-shadow:0 30px 80px rgba(0,0,0,.55);border-radius:10px;overflow:hidden}
+#stageFrame{border:0;display:block;transform-origin:top left;background:#000}
+#controls{display:flex;align-items:center;gap:12px;padding:10px 22px 16px}
+#playBtn{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#3b7bfd,#5e9bff);
+  color:#fff;font-size:16px;flex:none}
+#scrub{flex:1;-webkit-appearance:none;height:6px;border-radius:3px;background:#232c42;padding:0;border:0}
+#scrub::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+  background:#7cc4ff;box-shadow:0 0 10px rgba(124,196,255,.8)}
+#tcode{font-variant-numeric:tabular-nums;color:var(--dim);font-size:13px;min-width:110px;text-align:right}
+/* right panel */
+#panel{background:var(--bg2);border-left:1px solid var(--line);display:flex;
+  flex-direction:column;min-height:0}
+#tabs{display:flex;border-bottom:1px solid var(--line)}
+#tabs button{flex:1;background:transparent;color:var(--dim);padding:.8em 0;
+  border-radius:0;font-weight:600;font-size:12.5px;border-bottom:2px solid transparent}
+#tabs button.on{color:var(--txt);border-bottom-color:var(--acc)}
+#panelBody{overflow-y:auto;padding:16px;flex:1}
+.fld{margin-bottom:16px}
+.fld label{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);
+  margin-bottom:6px;font-weight:600;letter-spacing:.02em}
+.fld label b{color:var(--acc2);font-weight:600}
+.fld textarea{width:100%;min-height:150px;resize:vertical;line-height:1.55}
+.fld input[type=range]{width:100%;padding:0;-webkit-appearance:none;height:5px;
+  border-radius:3px;background:#232c42;border:0}
+.fld input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--acc2)}
+.fld select,.fld input[type=number]{width:100%}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.hint{font-size:11.5px;color:var(--dim);margin-top:5px}
+/* avatar grid */
+.avgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.avcard{background:var(--panel);border:2px solid var(--line);border-radius:14px;
+  padding:12px 8px;text-align:center;cursor:pointer;transition:.15s}
+.avcard:hover{border-color:#3a4a70}
+.avcard.sel{border-color:var(--acc);box-shadow:0 0 0 3px rgba(77,141,255,.22)}
+.avcard svg{width:74px;height:74px}
+.avcard .nm{font-weight:700;font-size:13px;margin-top:6px}
+.avcard .rl{font-size:11px;color:var(--dim)}
+.posgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.posgrid button{background:var(--panel);border:1px solid var(--line);color:var(--dim);
+  padding:.5em 0;font-size:11.5px;border-radius:8px}
+.posgrid button.on{border-color:var(--acc);color:var(--txt)}
+/* subtitle style cards */
+.stygrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stycard{border:2px solid var(--line);border-radius:11px;padding:14px 8px;text-align:center;
+  cursor:pointer;background:var(--panel);font-size:12px}
+.stycard.sel{border-color:var(--acc)}
+.stycard .demo{border-radius:7px;padding:.45em .3em;margin-bottom:8px;font-weight:700;font-size:12px}
+.tog{display:flex;justify-content:space-between;align-items:center;background:var(--panel);
+  border:1px solid var(--line);border-radius:11px;padding:.65em .9em;margin-bottom:10px}
+.tog span{font-weight:600;font-size:13px}
+.sw{position:relative;width:40px;height:22px;border-radius:12px;background:#28324a;
+  cursor:pointer;transition:.2s;flex:none}
+.sw.on{background:var(--acc)}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;
+  border-radius:50%;background:#fff;transition:.2s}
+.sw.on::after{left:21px}
+/* render */
+#renderBar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+#rprog{height:8px;background:#232c42;border-radius:4px;overflow:hidden;margin:10px 0 6px}
+#rprogFill{height:100%;width:0;background:linear-gradient(90deg,#3b7bfd,#7cc4ff);transition:width .4s}
+#rmsg{font-size:12px;color:var(--dim)}
+#doneBox video{width:100%;border-radius:10px;margin-top:10px}
+.badge{display:inline-block;background:#1b2b1f;border:1px solid #2c5c3f;color:var(--ok);
+  font-size:11px;padding:2px 9px;border-radius:8px;margin-left:8px}
+#voicesel .vc{display:flex;align-items:center;justify-content:space-between;background:var(--panel);
+  border:2px solid var(--line);border-radius:11px;padding:.7em .9em;margin-bottom:9px;cursor:pointer}
+#voicesel .vc.sel{border-color:var(--acc)}
+#voicesel .vc .t{font-weight:600;font-size:13px}
+#voicesel .vc .s{font-size:11px;color:var(--dim)}
+#uplStatus{color:var(--acc2);font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- ======================= LANDING ======================= -->
+<div id="landing">
+  <h1>Lumen <em>Studio</em></h1>
+  <p class="sub">Turn your presentation into a studio-quality training video —
+  an AI avatar teaches every slide with perfectly synchronized reveals,
+  subtitles and cinematic transitions. Your slides stay pixel-exact.</p>
+  <div id="drop">
+    <div class="big">Drop your presentation here</div>
+    <div style="color:var(--dim);margin-top:6px">.pptx or .pdf — layouts, fonts and styling preserved exactly</div>
+    <div style="margin-top:14px"><span class="btn pri" style="display:inline-block">Choose file</span></div>
+    <div id="uplStatus" style="margin-top:12px"></div>
+  </div>
+  <input type="file" id="fileInput" accept=".pptx,.pdf" class="hidden">
+  <div class="feat">
+    <div>🎬 Bullet-by-bullet reveals</div><div>🗣 Neural voices</div>
+    <div>👩‍🏫 8 professional avatars</div><div>💬 Karaoke subtitles</div>
+    <div>✨ Smart keyword callouts</div><div>📥 MP4 export</div>
+  </div>
+</div>
+
+<!-- ======================= APP ======================= -->
+<div id="app" class="hidden">
+  <div id="topbar">
+    <div class="logo">Lumen <em>Studio</em></div>
+    <input id="pname" value="Untitled project">
+    <div style="flex:1"></div>
+    <span id="saveState" style="color:var(--dim);font-size:12px"></span>
+    <button class="btn" id="backBtn">← New project</button>
+    <button class="btn pri" id="goRender">🎬 Generate video</button>
+  </div>
+  <div id="main">
+    <div id="rail"><h3>Slides</h3><div id="thumbs"></div></div>
+    <div id="center">
+      <div id="stageBox"><div id="stageScale">
+        <iframe id="stageFrame" src="stage.html"></iframe>
+      </div></div>
+      <div id="controls">
+        <button id="playBtn">▶</button>
+        <input type="range" id="scrub" min="0" max="100" step="0.05" value="0">
+        <div id="tcode">00:00 / 00:00</div>
+      </div>
+    </div>
+    <div id="panel">
+      <div id="tabs">
+        <button data-tab="script" class="on">Script</button>
+        <button data-tab="avatar">Presenter</button>
+        <button data-tab="style">Style</button>
+        <button data-tab="export">Export</button>
+      </div>
+      <div id="panelBody">
+        <!-- SCRIPT TAB -->
+        <div id="tab-script">
+          <div class="fld">
+            <label>Narration script — slide <b id="curSlideNo">1</b>
+              <b id="estDur">~0s</b></label>
+            <textarea id="script" placeholder="Write what the avatar should teach on this slide…"></textarea>
+            <div class="hint">Each sentence automatically reveals the next bullet and drives
+              subtitles &amp; keyword callouts.</div>
+          </div>
+          <div class="row2">
+            <div class="fld"><label>Speaking speed <b id="speedV">1.0×</b></label>
+              <input type="range" id="speed" min="0.7" max="1.4" step="0.05" value="1"></div>
+            <div class="fld"><label>Pause after slide <b id="pauseV">0.3s</b></label>
+              <input type="range" id="pause" min="0" max="2" step="0.1" value="0.3"></div>
+          </div>
+          <div class="fld"><label>Transition into this slide</label>
+            <select id="transition">
+              <option value="auto">✨ Auto (AI Scene Director)</option>
+              <option value="fade">Fade</option><option value="slide">Slide</option>
+              <option value="zoom">Zoom</option><option value="wipe">Cinematic wipe</option>
+              <option value="none">None</option>
+            </select></div>
+          <div class="fld"><label>Voice for this project</label>
+            <div id="voicesel"></div>
+            <button class="btn" id="voicePrev">🔊 Preview narration for this slide</button>
+            <span id="voicePrevState" class="hint"></span>
+          </div>
+        </div>
+        <!-- PRESENTER TAB -->
+        <div id="tab-avatar" class="hidden">
+          <div class="fld"><label>Presenter type</label>
+            <div class="posgrid" style="grid-template-columns:1fr 1fr">
+              <button id="modeFootage" data-mode="footage">🎥 Photoreal (your footage)</button>
+              <button id="modeAnimated" data-mode="animated" class="on">Animated character</button>
+            </div></div>
+          <div id="footageBox" class="hidden">
+            <div class="fld"><label>Photo presenter library</label>
+              <div class="avgrid" id="photogrid"></div>
+              <button class="btn" id="photoBtn" style="width:100%;margin-top:10px">➕ Add presenter photo</button>
+              <input type="file" id="photoInput" accept=".jpg,.jpeg,.png,.webp" class="hidden">
+              <div class="hint">Add studio-style portraits of real presenters. Generate them with your
+                AI image tool (ChatGPT, Gemini, Canva) — e.g. <i>“professional studio headshot of a
+                Latin American businesswoman, warm confident smile, navy blazer, soft neutral
+                background, facing camera”</i> — then add them here. Lips are AI-synced to the
+                narration at render time.</div>
+            </div>
+            <div class="fld">
+              <label>Or: real presenter footage</label>
+              <button class="btn" id="footageBtn" style="width:100%">⬆ Upload 15–30s front-facing video or portrait photo</button>
+              <input type="file" id="footageInput" accept=".mp4,.mov,.webm,.jpg,.jpeg,.png" class="hidden">
+              <div class="hint" id="footageState">No footage uploaded yet. The presenter's lips are
+                AI-synced to the narration at render time (adds a few minutes per video).</div>
+            </div>
+            <div class="row2">
+              <div class="fld"><label>Frame shape</label>
+                <select id="pShape"><option value="circle">Circle</option>
+                  <option value="card">Rounded card</option></select></div>
+              <div class="fld"><label>Framing zoom <b id="pZoomV">1.0×</b></label>
+                <input type="range" id="pZoom" min="0.8" max="1.8" step="0.05" value="1"></div>
+            </div>
+            <div class="fld"><label>Vertical framing <b id="pOffV">0%</b></label>
+              <input type="range" id="pOff" min="-0.3" max="0.3" step="0.02" value="0"></div>
+            <div class="hint" style="margin-bottom:14px">Position &amp; size below apply to both modes.
+              Note: the bundled lip-sync model is for research/personal use — for commercial
+              distribution use licensed footage of your own presenter.</div>
+          </div>
+          <div id="animatedBox">
+            <div class="fld"><label>Character</label><div class="avgrid" id="avgrid"></div></div>
+          </div>
+          <div class="fld"><label>Position</label>
+            <div class="posgrid">
+              <button data-pos="bl">◣ Left</button><button data-pos="br" class="on">◢ Right</button>
+              <button data-pos="tl">◤ Top-L</button><button data-pos="tr">◥ Top-R</button>
+            </div></div>
+          <div class="row2">
+            <div class="fld"><label>Size <b id="avsizeV">24%</b></label>
+              <input type="range" id="avsize" min="0.12" max="0.4" step="0.01" value="0.24"></div>
+            <div class="fld"><label>Visible</label>
+              <div class="sw on" id="avvis" style="margin-top:4px"></div></div>
+          </div>
+          <div class="row2">
+            <div class="fld"><label>Energy <b id="enV">60%</b></label>
+              <input type="range" id="energy" min="0" max="1" step="0.05" value="0.6"></div>
+            <div class="fld"><label>Smile <b id="smV">50%</b></label>
+              <input type="range" id="smile" min="0" max="1" step="0.05" value="0.5"></div>
+          </div>
+          <div class="row2">
+            <div class="fld"><label>Hand/head gestures <b id="geV">50%</b></label>
+              <input type="range" id="gesture" min="0" max="1" step="0.05" value="0.5"></div>
+            <div class="fld"><label>Eye contact <b id="eyV">75%</b></label>
+              <input type="range" id="eyec" min="0" max="1" step="0.05" value="0.75"></div>
+          </div>
+        </div>
+        <!-- STYLE TAB -->
+        <div id="tab-style" class="hidden">
+          <div class="fld"><label>Subtitle style</label>
+            <div class="stygrid" id="stygrid"></div></div>
+          <div class="tog"><span>Cinematic camera direction</span><div class="sw on" id="tCine"></div></div>
+          <div class="tog"><span>Highlight sweep on reveals</span><div class="sw on" id="tSweep"></div></div>
+          <div class="tog"><span>Subtitles <small style="color:var(--dim)">(off for clean look)</small></span><div class="sw" id="tSubs"></div></div>
+          <div class="tog"><span>Keyword callouts</span><div class="sw" id="tKw"></div></div>
+          <div class="tog"><span>Progress bar</span><div class="sw" id="tProg"></div></div>
+        </div>
+        <!-- EXPORT TAB -->
+        <div id="tab-export" class="hidden">
+          <div class="row2">
+            <div class="fld"><label>Resolution</label>
+              <select id="resSel">
+                <option value="1280x720">HD 720p</option>
+                <option value="1920x1080" selected>Full HD 1080p</option>
+                <option value="2560x1440">QHD 1440p</option>
+              </select></div>
+            <div class="fld"><label>Frame rate</label>
+              <select id="fpsSel"><option>24</option><option selected>30</option><option>60</option></select></div>
+          </div>
+          <div class="fld"><label>Quality preset</label>
+            <select id="qSel">
+              <option value="fast">⚡ Fast draft</option>
+              <option value="balanced" selected>⚖ Balanced</option>
+              <option value="studio">🎥 Studio quality</option>
+            </select></div>
+          <div id="renderBar">
+            <b>Render</b><span id="rstate" class="badge hidden">done</span>
+            <div id="rprog"><div id="rprogFill"></div></div>
+            <div id="rmsg">Ready. Click “Generate video”.</div>
+            <div id="doneBox" class="hidden">
+              <video id="outVideo" controls></video>
+              <a id="dlLink" class="btn pri" style="display:block;text-align:center;margin-top:10px"
+                 download>⬇ Download MP4</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const api=(p,opt)=>fetch(p,opt).then(r=>{if(!r.ok)throw new Error('api');return r.json()});
+let P=null;            // project
+let cur=0;             // selected slide
+let previewTL=null, playing=false, playT=0, lastTick=0, audioEl=null, finalTL=null;
+let saveTimer=null;
+
+/* ------------------------------ upload ------------------------------ */
+const drop=$('#drop'), fi=$('#fileInput');
+drop.onclick=()=>fi.click();
+['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',ev=>{ if(ev.dataTransfer.files[0]) doUpload(ev.dataTransfer.files[0]); });
+fi.onchange=()=>{ if(fi.files[0]) doUpload(fi.files[0]); };
+async function doUpload(f){
+  $('#uplStatus').textContent='Uploading & analyzing slides… (this builds every reveal state — ~1 min)';
+  const fd=new FormData(); fd.append('file',f);
+  try{
+    const r=await fetch('/api/upload',{method:'POST',body:fd});
+    if(!r.ok){ const e=await r.json().catch(()=>({detail:'upload failed'}));
+      $('#uplStatus').textContent='⚠ '+(e.detail||'Upload failed'); return; }
+    P=await r.json(); enterEditor();
+  }catch(e){ $('#uplStatus').textContent='⚠ Upload failed — is the server running?'; }
+}
+
+/* ------------------------------ editor ------------------------------ */
+function enterEditor(){
+  $('#landing').classList.add('hidden'); $('#app').classList.remove('hidden');
+  $('#pname').value=P.name;
+  buildThumbs(); buildAvatars(); buildVoices(); buildStyles(); loadPhotoLib();
+  selectSlide(0); syncControlsFromProject(); fitStage();
+  rebuildPreview();
+  pollProgress(true);
+}
+$('#backBtn').onclick=()=>location.reload();
+window.addEventListener('resize',fitStage);
+
+function fitStage(){
+  const box=$('#stageBox'), fr=$('#stageFrame'), sc=$('#stageScale');
+  const W=P?P.width:1920, H=P?P.height:1080;
+  fr.width=W; fr.height=H; fr.style.width=W+'px'; fr.style.height=H+'px';
+  const availW=box.clientWidth-36, availH=box.clientHeight-36;
+  const k=Math.min(availW/W, availH/H);
+  fr.style.transform=`scale(${k})`;
+  sc.style.width=(W*k)+'px'; sc.style.height=(H*k)+'px';
+}
+
+function buildThumbs(){
+  const t=$('#thumbs'); t.innerHTML='';
+  P.slides.forEach((s,i)=>{
+    const d=document.createElement('div'); d.className='thumb'+(i===cur?' sel':'');
+    d.innerHTML=`<img src="/api/project/${P.id}/thumb/${i}"><span class="n">${i+1}</span>
+                 <span class="d">~${s.est}s</span>`;
+    d.onclick=()=>selectSlide(i);
+    t.appendChild(d);
+  });
+}
+function selectSlide(i){
+  cur=i;
+  document.querySelectorAll('.thumb').forEach((el,j)=>el.classList.toggle('sel',j===i));
+  const s=P.slides[i];
+  $('#curSlideNo').textContent=i+1;
+  $('#script').value=s.script||'';
+  $('#speed').value=s.speed||1; $('#speedV').textContent=(s.speed||1).toFixed(2)+'×';
+  $('#pause').value=s.pause??0.3; $('#pauseV').textContent=(s.pause??0.3)+'s';
+  $('#transition').value=s.transition||'auto';
+  $('#estDur').textContent='~'+(s.est||0)+'s';
+  if(previewTL) seekPreview(previewTL.slides[i].t0+0.01,true);
+}
+
+/* ---------------- controls binding ---------------- */
+function markDirty(){
+  $('#saveState').textContent='saving…';
+  clearTimeout(saveTimer); saveTimer=setTimeout(saveProject,600);
+}
+async function saveProject(){
+  const r=await api(`/api/project/${P.id}`,{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({data:P})});
+  P.slides.forEach((s,i)=>s.est=r.slides[i].est);
+  buildThumbs(); document.querySelectorAll('.thumb')[cur]?.classList.add('sel');
+  $('#estDur').textContent='~'+(P.slides[cur].est||0)+'s';
+  $('#saveState').textContent='saved ✓';
+  rebuildPreview();
+}
+$('#script').addEventListener('input',()=>{P.slides[cur].script=$('#script').value;markDirty()});
+$('#pname').addEventListener('input',()=>{P.name=$('#pname').value;markDirty()});
+$('#speed').addEventListener('input',()=>{const v=+$('#speed').value;
+  P.slides[cur].speed=v;$('#speedV').textContent=v.toFixed(2)+'×';markDirty()});
+$('#pause').addEventListener('input',()=>{const v=+$('#pause').value;
+  P.slides[cur].pause=v;$('#pauseV').textContent=v+'s';markDirty()});
+$('#transition').addEventListener('change',()=>{P.slides[cur].transition=$('#transition').value;markDirty()});
+
+/* tabs */
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  ['script','avatar','style','export'].forEach(t=>
+    $('#tab-'+t).classList.toggle('hidden',b.dataset.tab!==t));
+});
+
+/* voices */
+async function buildVoices(){
+  const vs=await api('/api/voices'); const box=$('#voicesel');
+  box.innerHTML='';
+  vs.forEach(v=>{
+    const d=document.createElement('div');
+    d.className='vc'+(P.voice===v.id?' sel':'');
+    d.innerHTML=`<div><div class="t">${v.label}</div><div class="s">${v.tags.join(' · ')}</div></div>
+      <div>${P.voice===v.id?'✓':''}</div>`;
+    d.onclick=()=>{P.voice=v.id;buildVoices();markDirty()};
+    box.appendChild(d);
+  });
+}
+$('#voicePrev').onclick=async()=>{
+  $('#voicePrevState').textContent=' synthesizing…';
+  const a=new Audio(`/api/project/${P.id}/preview_audio/${cur}?ts=${Date.now()}`);
+  a.oncanplaythrough=()=>{$('#voicePrevState').textContent='';a.play()};
+  a.onerror=()=>$('#voicePrevState').textContent=' ⚠ preview failed';
+};
+
+/* avatars */
+function buildAvatars(){
+  const g=$('#avgrid'); g.innerHTML='';
+  AVATARS.forEach(a=>{
+    const d=document.createElement('div');
+    d.className='avcard'+(P.avatar.id===a.id?' sel':'');
+    d.innerHTML=avatarSVG(a.id)+`<div class="nm">${a.name}</div><div class="rl">${a.role}</div>`;
+    d.onclick=()=>{P.avatar.id=a.id;buildAvatars();markDirty()};
+    g.appendChild(d);
+  });
+}
+const POS={bl:[0.145,0.80],br:[0.855,0.80],tl:[0.145,0.20],tr:[0.855,0.20]};
+document.querySelectorAll('.posgrid button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.posgrid button').forEach(x=>x.classList.toggle('on',x===b));
+  const [x,y]=POS[b.dataset.pos]; P.avatar.x=x;P.avatar.y=y;markDirty();
+});
+$('#avsize').addEventListener('input',()=>{const v=+$('#avsize').value;
+  P.avatar.size=v;$('#avsizeV').textContent=Math.round(v*100)+'%';markDirty()});
+$('#avvis').onclick=()=>{const el=$('#avvis');el.classList.toggle('on');
+  P.avatar.visible=el.classList.contains('on');markDirty()};
+[['energy','enV'],['smile','smV'],['gesture','geV'],['eyec','eyV']].forEach(([id,lab])=>{
+  $('#'+id).addEventListener('input',()=>{
+    const v=+$('#'+id).value;
+    $('#'+lab).textContent=Math.round(v*100)+'%';
+    P.avatarOpts={...P.avatarOpts,[id==='eyec'?'eye':id]:v};markDirty();
+  });
+});
+
+/* styles */
+const STYLES=[['professional','Professional','background:#141a28;color:#7cc4ff'],
+  ['modern','Modern','background:#000;color:#ffd34d'],
+  ['minimal','Minimal','background:#222;color:#fff'],
+  ['corporate','Corporate','background:linear-gradient(90deg,#10233f,#1b3a66);color:#8fd0ff'],
+  ['education','Education','background:#fff;color:#c8401a;border:2px solid #1b3a66']];
+function buildStyles(){
+  const g=$('#stygrid'); g.innerHTML='';
+  STYLES.forEach(([id,nm,css])=>{
+    const d=document.createElement('div');
+    d.className='stycard'+(P.subtitleStyle===id?' sel':'');
+    d.innerHTML=`<div class="demo" style="${css}">Sample subtitle</div>${nm}`;
+    d.onclick=()=>{P.subtitleStyle=id;buildStyles();markDirty()};
+    g.appendChild(d);
+  });
+}
+[['tSubs','showSubtitles'],['tKw','showKeywords'],['tProg','showProgress'],
+ ['tCine','cinematic'],['tSweep','highlightSweeps']]
+.forEach(([id,key])=>{
+  $('#'+id).onclick=()=>{const el=$('#'+id);el.classList.toggle('on');
+    P[key]=el.classList.contains('on');markDirty()};
+});
+/* presenter mode + photo library + footage */
+let PHOTOLIB=[];
+async function loadPhotoLib(){
+  try{ PHOTOLIB=await api('/api/presenters'); }catch(e){ PHOTOLIB=[]; }
+  const g=$('#photogrid'); g.innerHTML='';
+  PHOTOLIB.forEach(ph=>{
+    const d=document.createElement('div');
+    const sel=P.presenter&&P.presenter.mode==='photo'&&P.presenter.photoId===ph.id;
+    d.className='avcard'+(sel?' sel':'');
+    d.innerHTML=`<img src="/api/presenters/${ph.id}/img" style="width:74px;height:74px;
+        border-radius:50%;object-fit:cover;object-position:center 20%">
+      <div class="nm">${ph.name}</div><div class="rl">${ph.role||'Presenter'}</div>`;
+    d.onclick=()=>{P.presenter={...P.presenter,mode:'photo',photoId:ph.id};
+      loadPhotoLib();syncPresenterUI();markDirty();rebuildPreview()};
+    g.appendChild(d);
+  });
+  if(!PHOTOLIB.length)
+    g.innerHTML='<div class="hint" style="grid-column:1/-1">No presenter photos yet — add one below.</div>';
+}
+$('#photoBtn').onclick=()=>$('#photoInput').click();
+$('#photoInput').onchange=async()=>{
+  const f=$('#photoInput').files[0]; if(!f) return;
+  const nm=prompt('Presenter name?','Sofia')||'Presenter';
+  const rl=prompt('Role? (e.g. Corporate Trainer)','Corporate Trainer')||'';
+  const fd=new FormData(); fd.append('file',f); fd.append('name',nm); fd.append('role',rl);
+  const r=await fetch('/api/presenters',{method:'POST',body:fd});
+  if(r.ok){ const j=await r.json();
+    P.presenter={...P.presenter,mode:'photo',photoId:j.id};
+    await loadPhotoLib(); syncPresenterUI(); markDirty(); rebuildPreview(); }
+};
+function syncPresenterUI(){
+  const pr=P.presenter||{mode:'animated'};
+  const real=pr.mode==='footage'||pr.mode==='photo';
+  $('#modeFootage').classList.toggle('on',real);
+  $('#modeAnimated').classList.toggle('on',!real);
+  $('#footageBox').classList.toggle('hidden',!real);
+  $('#animatedBox').classList.toggle('hidden',real);
+  if(pr.hasFootage) $('#footageState').textContent='✓ Footage uploaded — lips will be AI-synced to the narration at render time.';
+  $('#pShape').value=pr.shape||'circle';
+  $('#pZoom').value=pr.zoom||1;$('#pZoomV').textContent=(pr.zoom||1).toFixed(2)+'×';
+  $('#pOff').value=pr.offsetY||0;$('#pOffV').textContent=Math.round((pr.offsetY||0)*100)+'%';
+}
+$('#modeFootage').onclick=()=>{P.presenter={...P.presenter,
+  mode:(P.presenter&&P.presenter.photoId)?'photo':'footage'};
+  loadPhotoLib();syncPresenterUI();markDirty();rebuildPreview()};
+$('#modeAnimated').onclick=()=>{P.presenter={...P.presenter,mode:'animated'};
+  syncPresenterUI();markDirty();rebuildPreview()};
+$('#pShape').onchange=()=>{P.presenter={...P.presenter,shape:$('#pShape').value};markDirty()};
+$('#pZoom').addEventListener('input',()=>{const v=+$('#pZoom').value;
+  P.presenter={...P.presenter,zoom:v};$('#pZoomV').textContent=v.toFixed(2)+'×';markDirty()});
+$('#pOff').addEventListener('input',()=>{const v=+$('#pOff').value;
+  P.presenter={...P.presenter,offsetY:v};$('#pOffV').textContent=Math.round(v*100)+'%';markDirty()});
+$('#footageBtn').onclick=()=>$('#footageInput').click();
+$('#footageInput').onchange=async()=>{
+  const f=$('#footageInput').files[0]; if(!f) return;
+  $('#footageState').textContent='Uploading footage…';
+  const fd=new FormData(); fd.append('file',f);
+  const r=await fetch(`/api/project/${P.id}/presenter_footage`,{method:'POST',body:fd});
+  if(r.ok){ const j=await r.json(); P.presenter=j.presenter; syncPresenterUI(); }
+  else $('#footageState').textContent='⚠ Upload failed — use .mp4/.mov/.webm or .jpg/.png';
+};
+function syncControlsFromProject(){
+  $('#avsize').value=P.avatar.size;$('#avsizeV').textContent=Math.round(P.avatar.size*100)+'%';
+  $('#avvis').classList.toggle('on',P.avatar.visible!==false);
+  $('#energy').value=P.avatarOpts.energy;$('#enV').textContent=Math.round(P.avatarOpts.energy*100)+'%';
+  $('#smile').value=P.avatarOpts.smile;$('#smV').textContent=Math.round(P.avatarOpts.smile*100)+'%';
+  $('#gesture').value=P.avatarOpts.gesture;$('#geV').textContent=Math.round(P.avatarOpts.gesture*100)+'%';
+  $('#eyec').value=P.avatarOpts.eye;$('#eyV').textContent=Math.round(P.avatarOpts.eye*100)+'%';
+  [['tSubs','showSubtitles'],['tKw','showKeywords'],['tProg','showProgress'],
+   ['tCine','cinematic'],['tSweep','highlightSweeps']]
+    .forEach(([id,key])=>$('#'+id).classList.toggle('on',!!P[key]));
+  syncPresenterUI();
+  const res=`${P.width}x${P.height}`;
+  if([...$('#resSel').options].some(o=>o.value===res)) $('#resSel').value=res;
+  $('#fpsSel').value=P.fps; $('#qSel').value=P.quality;
+}
+$('#resSel').onchange=()=>{const [w,h]=$('#resSel').value.split('x').map(Number);
+  P.width=w;P.height=h;markDirty();fitStage();rebuildPreview()};
+$('#fpsSel').onchange=()=>{P.fps=+$('#fpsSel').value;markDirty()};
+$('#qSel').onchange=()=>{P.quality=$('#qSel').value;markDirty()};
+
+/* ---------------------- live preview timeline ---------------------- */
+function estimateTL(){
+  // client-side estimated timeline (final render uses exact TTS timings)
+  const slides=[]; let t=0;
+  P.slides.forEach((s,i)=>{
+    const script=(s.script||'').trim()||`Slide ${i+1}.`;
+    const sents=script.replace(/\s+/g,' ').match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[script];
+    const speed=s.speed||1;
+    const lead=0.5, gap=0.24+(s.pause??0.3)*0.4;
+    let tt=t+lead; const sentences=[];
+    const K=(s.n_states||1)-1, N=sents.length, reveals=[];
+    sents.forEach((txt,j)=>{
+      txt=txt.trim();
+      const words=txt.split(/\s+/);
+      const dur=Math.max(0.8,words.length/(2.45*speed));
+      const wobjs=[]; let wt=tt;
+      const tot=words.reduce((a,w)=>a+w.length+1.5,0);
+      words.forEach(w=>{const d=dur*(w.length+1.5)/tot;
+        wobjs.push({w,t0:+wt.toFixed(2),t1:+(wt+d).toFixed(2)});wt+=d;});
+      // keyword: longest capitalized word >4 chars
+      const kw=(txt.match(/\b[A-Z][A-Za-z-]{3,}(?:\s+[A-Z][A-Za-z-]{2,}){0,2}/g)||[])
+        .sort((a,b)=>b.length-a.length)[0]||'';
+      sentences.push({text:txt,t0:+tt.toFixed(2),t1:+(tt+dur).toFixed(2),
+        words:wobjs,keyword:words.length>3?kw:''});
+      if(K>0){
+        const target=N>=K?Math.min(K,Math.floor((j+1)*K/N)):Math.min(K,Math.round((j+1)*K/N));
+        const prev=reveals.length?reveals[reveals.length-1].state:0;
+        if(target>prev) reveals.push({t:+(tt-0.12).toFixed(2),state:target});
+      }
+      tt+=dur+gap;
+    });
+    if(K>0&&(!reveals.length||reveals[reveals.length-1].state<K))
+      reveals.push({t:+(tt-0.5).toFixed(2),state:K});
+    const t1=tt+0.55+(s.pause??0.3);
+    const trans=s.transition==='auto'?(i===0?'none':['fade','slide','zoom','wipe'][(i-1)%4]):s.transition;
+    slides.push({t0:+t.toFixed(2),t1:+t1.toFixed(2),transition:trans,
+      states:Array.from({length:s.n_states||1},(_,k)=>`/api/project/${P.id}/state/${i}/${k}`),
+      reveals,sentences});
+    t=t1;
+  });
+  const av={...P.avatar};
+  if(P.presenter&&P.presenter.mode==='photo'&&P.presenter.photoId)
+    av.photoUrl=`/api/presenters/${P.presenter.photoId}/img`;
+  return {width:P.width,height:P.height,fps:P.fps,total:+t.toFixed(2),
+    subtitleStyle:P.subtitleStyle,showSubtitles:P.showSubtitles,
+    showKeywords:P.showKeywords,showProgress:P.showProgress,cinematic:P.cinematic,
+    avatar:av,avatarOpts:P.avatarOpts,slides};
+}
+function stageWin(){ return $('#stageFrame').contentWindow; }
+function rebuildPreview(){
+  previewTL=estimateTL();
+  const w=stageWin();
+  const push=()=>{ if(w.initStage){ w.MOUTH=null; w.initStage(previewTL); w.seek(playT||0.01);}
+                   else setTimeout(push,120); };
+  push();
+  $('#scrub').max=previewTL.total;
+  updateTcode();
+}
+$('#stageFrame').addEventListener('load',rebuildPreview);
+
+/* transport */
+function fmt(t){t=Math.max(0,t);const m=String(Math.floor(t/60)).padStart(2,'0'),
+  s=String(Math.floor(t%60)).padStart(2,'0');return `${m}:${s}`}
+function updateTcode(){$('#tcode').textContent=`${fmt(playT)} / ${fmt(previewTL?previewTL.total:0)}`}
+function seekPreview(t,updateScrub){
+  playT=Math.max(0,Math.min(t,(previewTL?previewTL.total:0)-0.01));
+  const w=stageWin(); if(w.seek&&w.TL) w.seek(playT);
+  if(updateScrub) $('#scrub').value=playT;
+  updateTcode();
+}
+$('#scrub').addEventListener('input',()=>seekPreview(+$('#scrub').value,false));
+$('#playBtn').onclick=()=>{ playing=!playing;
+  $('#playBtn').textContent=playing?'⏸':'▶';
+  if(playing){ lastTick=performance.now();
+    if(finalTL&&audioEl){ audioEl.currentTime=playT; audioEl.play(); }
+    requestAnimationFrame(tick); }
+  else if(audioEl) audioEl.pause();
+};
+function tick(now){
+  if(!playing) return;
+  if(finalTL&&audioEl&&!audioEl.paused){ playT=audioEl.currentTime; }
+  else { playT+=(now-lastTick)/1000; }
+  lastTick=now;
+  if(previewTL&&playT>=previewTL.total){ playing=false;$('#playBtn').textContent='▶';
+    if(audioEl)audioEl.pause(); return; }
+  seekPreview(playT,true);
+  requestAnimationFrame(tick);
+}
+
+/* ------------------------------ render ------------------------------ */
+$('#goRender').onclick=async()=>{
+  document.querySelector('[data-tab=export]').click();
+  await saveProject();
+  await api(`/api/project/${P.id}/render`,{method:'POST'});
+  pollProgress();
+};
+/* reopen an existing project via ?p=<id> */
+(async()=>{
+  const pid=new URLSearchParams(location.search).get('p');
+  if(pid){ try{ P=await api('/api/project/'+pid); enterEditor(); }catch(e){} }
+})();
+let pollTimer=null;
+async function pollProgress(passive){
+  clearTimeout(pollTimer);
+  const p=await api(`/api/project/${P.id}/progress`).catch(()=>null);
+  if(!p) return;
+  const fill=$('#rprogFill'), msg=$('#rmsg');
+  if(p.stage==='idle'){ if(!passive) pollTimer=setTimeout(pollProgress,1500); return; }
+  if(p.stage==='error'){ msg.textContent='⚠ '+p.msg; return; }
+  if(p.stage==='done'){
+    fill.style.width='100%'; msg.textContent='Render complete — studio-quality MP4 ready.';
+    $('#rstate').classList.remove('hidden');
+    $('#doneBox').classList.remove('hidden');
+    const url=`/api/project/${P.id}/video?ts=${Date.now()}`;
+    $('#outVideo').src=url; $('#dlLink').href=url;
+    // load exact timeline + narration for perfectly synced preview
+    try{
+      finalTL=await api(`/api/project/${P.id}/timeline`);
+      audioEl=new Audio(`/api/project/${P.id}/narration`);
+    }catch(e){}
+    return;
+  }
+  const MAP={voice:[0,0.14],render:[0.14,0.72],lipsync:[0.72,0.95],
+             composite:[0.95,1],queue:[0,0]};
+  const seg=MAP[p.stage]||[0,1];
+  const frac=seg[0]+p.frac*(seg[1]-seg[0]);
+  fill.style.width=(frac*100).toFixed(1)+'%';
+  msg.textContent=p.msg;
+  pollTimer=setTimeout(pollProgress,1200);
+}
+</script>
+</body>
+</html>

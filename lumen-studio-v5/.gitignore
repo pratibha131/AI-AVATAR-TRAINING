@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.mp4
+*.onnx
+voices/*.onnx
+projects/*/build/
+projects/*/out/*.wav
+projects/*/states/
+projects/*/thumbs/
+scratch/
+
+# large ML weights (downloaded via download_models.py)
+models/
+*.pth
