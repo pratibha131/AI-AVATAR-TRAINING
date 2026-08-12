@@ -1,4 +1,4 @@
-# Lumen Studio — AI Avatar Training Video Platform
+# AI Training session — AI Avatar Training Video Platform
 
 Turns a PowerPoint or PDF presentation into a narrated training video with an
 AI avatar presenter — **without changing a pixel of your slides**. Everything

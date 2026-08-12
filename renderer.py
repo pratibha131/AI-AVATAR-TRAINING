@@ -15,9 +15,23 @@ def get_ffmpeg_cmd():
         return f
     try:
         import imageio_ffmpeg
-        return imageio_ffmpeg.get_ffmpeg_exe()
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if exe and os.path.exists(exe):
+            return exe
     except Exception:
         pass
+    import glob
+    candidates = (
+        glob.glob(os.path.expanduser('~/AppData/Local/ms-playwright/ffmpeg*/ffmpeg*.exe')) +
+        glob.glob(os.path.expanduser('~/.cache/ms-playwright/ffmpeg*/ffmpeg*')) +
+        [
+            r"C:\ffmpeg\bin\ffmpeg.exe",
+            r"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
+        ]
+    )
+    for c in candidates:
+        if os.path.exists(c):
+            return c
     return 'ffmpeg'
 
 FFMPEG_CMD = get_ffmpeg_cmd()
